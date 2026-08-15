@@ -1,0 +1,272 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Pistachio Dream Palette Tokens */
+  --pistachio-mint: #42D674;
+  --pistachio-light: #80EF80;
+  --pistachio-pale: #E3F0A3;
+  --pistachio-sage: #BADBA2;
+  --pistachio-dark: #1e3a29;
+  --pistachio-deep: #132a1c;
+  
+  --bg-app: #f4f8f3;
+  --bg-header: rgba(255, 255, 255, 0.9);
+  --bg-card: #ffffff;
+  --bg-card-alt: #f7faf5;
+  --bg-surface: #edf5ea;
+  --bg-surface-hover: #e2edd9;
+  
+  --border-subtle: #e2ede0;
+  --border-card: #d8e8d5;
+  --border-card-hover: #BADBA2;
+  --border-focus: #42D674;
+  
+  --text-primary: #172a1e;
+  --text-secondary: #4a6352;
+  --text-muted: #718d79;
+  --text-subtle: #9cb5a3;
+  
+  --color-brand: #42D674;
+  --color-brand-dark: #22a34f;
+  --color-success: #38c168;
+  --color-success-bg: rgba(66, 214, 116, 0.14);
+  --color-warning: #d97706;
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-danger: #e11d48;
+  --color-danger-bg: rgba(225, 29, 72, 0.10);
+  
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+  
+  --shadow-card: 0 4px 20px -2px rgba(30, 58, 41, 0.06);
+  --shadow-hover: 0 10px 30px -4px rgba(30, 58, 41, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Pistachio Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--pistachio-sage);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pistachio-mint);
+}
+
+/* App Header */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(16px);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Pistachio Dream Modern Cards */
+.modern-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 22px;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modern-card:hover {
+  border-color: var(--border-card-hover);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+/* Modern Clean Buttons */
+.modern-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  user-select: none;
+}
+
+.modern-btn:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-card-hover);
+}
+
+.modern-btn:active {
+  transform: scale(0.98);
+}
+
+.modern-btn-primary {
+  background: var(--pistachio-mint);
+  border-color: #38c168;
+  color: #0c3319;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(66, 214, 116, 0.35);
+}
+
+.modern-btn-primary:hover {
+  background: #36c566;
+  box-shadow: 0 4px 14px rgba(66, 214, 116, 0.45);
+}
+
+.modern-btn-pale {
+  background: var(--pistachio-pale);
+  border-color: #d6e68f;
+  color: #27401c;
+  font-weight: 600;
+}
+
+.modern-btn-pale:hover {
+  background: #d8ea8e;
+}
+
+.modern-btn-success {
+  background: var(--color-success-bg);
+  border-color: rgba(66, 214, 116, 0.4);
+  color: #1b6635;
+}
+
+.modern-btn-success:hover {
+  background: rgba(66, 214, 116, 0.25);
+}
+
+.modern-btn-danger {
+  background: var(--color-danger-bg);
+  border-color: rgba(225, 29, 72, 0.3);
+  color: #be123c;
+}
+
+.modern-btn-danger:hover {
+  background: rgba(225, 29, 72, 0.18);
+}
+
+.modern-btn-sm {
+  padding: 5px 12px;
+  font-size: 0.76rem;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.70rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+}
+
+.status-badge-alive {
+  background: rgba(66, 214, 116, 0.18);
+  color: #176534;
+  border: 1px solid rgba(66, 214, 116, 0.4);
+}
+
+.status-badge-failed {
+  background: rgba(225, 29, 72, 0.12);
+  color: #be123c;
+  border: 1px solid rgba(225, 29, 72, 0.3);
+}
+
+.status-badge-brand {
+  background: rgba(186, 219, 162, 0.4);
+  color: #1e3a29;
+  border: 1px solid #BADBA2;
+}
+
+/* Pulse Dot */
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.pulse-dot-green {
+  background-color: #42D674;
+  box-shadow: 0 0 8px #42D674;
+}
+
+.pulse-dot-red {
+  background-color: #e11d48;
+  box-shadow: 0 0 8px #e11d48;
+}
+
+/* Clean Input Fields */
+.modern-input {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  outline: none;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.modern-input:focus {
+  border-color: var(--pistachio-mint);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(66, 214, 116, 0.18);
+}
+
+/* Key Value Telemetry Strip */
+.stat-strip {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  background: var(--bg-card-alt);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
