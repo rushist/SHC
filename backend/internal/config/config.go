@@ -11,6 +11,7 @@ import (
 // NodeConfig holds all configuration parameters for a cache node instance.
 type NodeConfig struct {
 	NodeID            string        `json:"node_id"`
+	HostID            string        `json:"host_id"` // e.g. EC2-A, EC2-B, EC2-C
 	Host              string        `json:"host"`
 	Port              int           `json:"port"`
 	Peers             []string      `json:"peers"`
@@ -24,12 +25,12 @@ type NodeConfig struct {
 }
 
 // ParseFlags parses CLI flags and environment variables to construct a NodeConfig.
-// CLI flags override environment variables; environment variables override default values.
 func ParseFlags() NodeConfig {
-	defaultID := getEnv("CACHE_NODE_ID", "node-1")
-	defaultHost := getEnv("CACHE_HOST", "0.0.0.0")
-	defaultPort := getEnvInt("PORT", 8001)
-	defaultPeers := getEnv("CACHE_PEERS", "")
+	defaultID := getFirstEnv([]string{"NODE_ID", "CACHE_NODE_ID"}, "node-a")
+	defaultHostID := getFirstEnv([]string{"HOST_ID", "EC2_HOST_ID"}, "EC2-A")
+	defaultHost := getFirstEnv([]string{"NODE_ADDRESS", "CACHE_HOST"}, "0.0.0.0")
+	defaultPort := getFirstEnvInt([]string{"PORT", "NODE_PORT"}, 8001)
+	defaultPeers := getFirstEnv([]string{"PEER_NODES", "PEERS", "CACHE_PEERS"}, "")
 	defaultCleanup := getEnvDuration("CLEANUP_INTERVAL", 1*time.Second)
 	defaultPingTimeout := getEnvDuration("PING_TIMEOUT", 2*time.Second)
 	defaultHeartbeat := getEnvDuration("HEARTBEAT_INTERVAL", 1*time.Second)
@@ -38,10 +39,11 @@ func ParseFlags() NodeConfig {
 	defaultHkWindow := getEnvDuration("HOTKEY_WINDOW", 5*time.Second)
 	defaultHkThreshold := uint64(getEnvInt("HOTKEY_THRESHOLD", 20))
 
-	nodeID := flag.String("id", defaultID, "Unique identifier for this node (or env CACHE_NODE_ID)")
-	host := flag.String("host", defaultHost, "Host address to bind to (or env CACHE_HOST)")
-	port := flag.Int("port", defaultPort, "Port number to listen on (or env PORT)")
-	peersRaw := flag.String("peers", defaultPeers, "Comma-separated list of peers (or env CACHE_PEERS)")
+	nodeID := flag.String("id", defaultID, "Unique identifier for this node (or env NODE_ID)")
+	hostID := flag.String("host-id", defaultHostID, "Physical host/EC2 instance identifier (or env HOST_ID)")
+	host := flag.String("host", defaultHost, "Host address to bind to (or env NODE_ADDRESS)")
+	port := flag.Int("port", defaultPort, "Port number to listen on (or env PORT / NODE_PORT)")
+	peersRaw := flag.String("peers", defaultPeers, "Comma-separated list of peers (or env PEER_NODES)")
 	cleanup := flag.Duration("cleanup", defaultCleanup, "TTL eviction ticker interval")
 	pingTimeout := flag.Duration("ping-timeout", defaultPingTimeout, "HTTP timeout for peer communications")
 	heartbeat := flag.Duration("heartbeat", defaultHeartbeat, "Heartbeat interval between peers")
@@ -64,6 +66,7 @@ func ParseFlags() NodeConfig {
 
 	return NodeConfig{
 		NodeID:            *nodeID,
+		HostID:            *hostID,
 		Host:              *host,
 		Port:              *port,
 		Peers:             peers,
@@ -77,27 +80,47 @@ func ParseFlags() NodeConfig {
 	}
 }
 
-func getEnv(key, defaultVal string) string {
+func getFirstEnv(keys []string, fallback string) string {
+	for _, k := range keys {
+		if val := os.Getenv(k); val != "" {
+			return val
+		}
+	}
+	return fallback
+}
+
+func getFirstEnvInt(keys []string, fallback int) int {
+	for _, k := range keys {
+		if val := os.Getenv(k); val != "" {
+			if i, err := strconv.Atoi(val); err == nil {
+				return i
+			}
+		}
+	}
+	return fallback
+}
+
+func getEnv(key, fallback string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
 	}
-	return defaultVal
+	return fallback
 }
 
-func getEnvInt(key string, defaultVal int) int {
+func getEnvInt(key string, fallback int) int {
 	if val := os.Getenv(key); val != "" {
 		if i, err := strconv.Atoi(val); err == nil {
 			return i
 		}
 	}
-	return defaultVal
+	return fallback
 }
 
-func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
 	if val := os.Getenv(key); val != "" {
 		if d, err := time.ParseDuration(val); err == nil {
 			return d
 		}
 	}
-	return defaultVal
+	return fallback
 }

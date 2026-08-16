@@ -1,0 +1,67 @@
+version: '3.8'
+
+# ==============================================================================
+# EC2-A MANIFEST (Failure Domain 1): Nodes A, D, and G
+# Target Host: EC2-A (e.g. Private IP: 10.0.1.10)
+# ==============================================================================
+
+services:
+  # Node A (Primary for A keys, Replicated to Node B on EC2-B)
+  node-a:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-a
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-a
+      - HOST_ID=EC2-A
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8001
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8001:8001"
+    network_mode: host
+
+  # Node D (Primary for D keys, Replicated to Node E on EC2-B)
+  node-d:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-d
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-d
+      - HOST_ID=EC2-A
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8002
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8002:8002"
+    network_mode: host
+
+  # Node G (Primary for G keys, Replicated to Node H on EC2-B)
+  node-g:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-g
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-g
+      - HOST_ID=EC2-A
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8003
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8003:8003"
+    network_mode: host

@@ -1,0 +1,67 @@
+version: '3.8'
+
+# ==============================================================================
+# EC2-C MANIFEST (Failure Domain 3): Nodes C, F, and I
+# Target Host: EC2-C (e.g. Private IP: 10.0.1.12)
+# ==============================================================================
+
+services:
+  # Node C (Primary for C keys, Replicated to Node D on EC2-A; Holds Replica of Node B from EC2-B)
+  node-c:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-c
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-c
+      - HOST_ID=EC2-C
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8001
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8001:8001"
+    network_mode: host
+
+  # Node F (Primary for F keys, Replicated to Node G on EC2-A; Holds Replica of Node E from EC2-B)
+  node-f:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-f
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-f
+      - HOST_ID=EC2-C
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8002
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8002:8002"
+    network_mode: host
+
+  # Node I (Primary for I keys, Replicated to Node A on EC2-A; Holds Replica of Node H from EC2-B)
+  node-i:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-node-i
+    restart: unless-stopped
+    command: ["/app/cachenode"]
+    environment:
+      - NODE_ID=node-i
+      - HOST_ID=EC2-C
+      - NODE_ADDRESS=0.0.0.0
+      - NODE_PORT=8003
+      - PEER_NODES=${PEER_NODES}
+      - CLEANUP_INTERVAL=1s
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+    ports:
+      - "8003:8003"
+    network_mode: host

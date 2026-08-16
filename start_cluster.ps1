@@ -23,31 +23,33 @@ foreach ($n in $nodes) {
     $port = 8000 + $idx
     $id = "node-$n"
 
-    # Build peers list
+    # Build peers list using 127.0.0.1 for deterministic IPv4 socket resolution on Windows
     $peers = ($nodes | Where-Object { $_ -ne $n } | ForEach-Object {
         $pIdx = [char][byte][char]$_ - [char][byte][char]'a' + 1
         $pPort = 8000 + $pIdx
-        "node-$_`=http://localhost:$pPort"
+        "node-$_`=http://127.0.0.1:$pPort"
     }) -join ","
 
-    $args = "-id $id -port $port -peers $peers"
-    $proc = Start-Process -FilePath $nodeBin -ArgumentList $args -PassThru -WindowStyle Hidden
+    $args = "-id $id -port $port -host 0.0.0.0 -peers $peers"
+    $proc = Start-Process -FilePath $nodeBin -ArgumentList $args -WorkingDirectory $PSScriptRoot -PassThru -WindowStyle Hidden
     Write-Host "Started Node $($n.ToUpper()) on :$port (PID: $($proc.Id))" -ForegroundColor Green
 }
+
+Start-Sleep -Milliseconds 600
 
 # 3. Launch Unified API Router on Port 8000
 $allNodes = ($nodes | ForEach-Object {
     $pIdx = [char][byte][char]$_ - [char][byte][char]'a' + 1
     $pPort = 8000 + $pIdx
-    "node-$_`=http://localhost:$pPort"
+    "node-$_`=http://127.0.0.1:$pPort"
 }) -join ","
 
-$routerArgs = "-port 8000 -nodes $allNodes"
-$routerProc = Start-Process -FilePath $routerBin -ArgumentList $routerArgs -PassThru -WindowStyle Hidden
+$routerArgs = "-port 8000 -host 0.0.0.0 -nodes $allNodes"
+$routerProc = Start-Process -FilePath $routerBin -ArgumentList $routerArgs -WorkingDirectory $PSScriptRoot -PassThru -WindowStyle Hidden
 Write-Host "Started Unified API Router on :8000 (PID: $($routerProc.Id))" -ForegroundColor Magenta
 
 Write-Host "`n===============================================================" -ForegroundColor Yellow
 Write-Host "  9-NODE DISTRIBUTED CACHE CLUSTER & ROUTER ARE RUNNING!       " -ForegroundColor Yellow
-Write-Host "  Public Client Gateway: http://localhost:8000                 " -ForegroundColor Yellow
+Write-Host "  Public Client Gateway: http://127.0.0.1:8000                 " -ForegroundColor Yellow
 Write-Host "  Nodes Active: :8001 through :8009                            " -ForegroundColor Yellow
 Write-Host "===============================================================" -ForegroundColor Yellow

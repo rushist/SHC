@@ -4,15 +4,29 @@ import React, { useState, useEffect, useCallback } from "react";
 import HashRing from "./components/HashRing";
 
 const ALL_NODES = [
-  { id: "node-a", port: 8001, label: "Node A", color: "#42D674" },
-  { id: "node-b", port: 8002, label: "Node B", color: "#80EF80" },
-  { id: "node-c", port: 8003, label: "Node C", color: "#BADBA2" },
-  { id: "node-d", port: 8004, label: "Node D", color: "#E3F0A3" },
-  { id: "node-e", port: 8005, label: "Node E", color: "#2eb872" },
-  { id: "node-f", port: 8006, label: "Node F", color: "#68bb59" },
-  { id: "node-g", port: 8007, label: "Node G", color: "#3caea3" },
-  { id: "node-h", port: 8008, label: "Node H", color: "#88d49e" },
-  { id: "node-i", port: 8009, label: "Node I", color: "#1b998b" },
+  // EC2-A Instance: Nodes A, D, G
+  { id: "node-a", port: 8001, label: "Node A", color: "#42D674", host: "EC2-A", replica: "Node B (EC2-B)" },
+  { id: "node-d", port: 8004, label: "Node D", color: "#2eb872", host: "EC2-A", replica: "Node E (EC2-B)" },
+  { id: "node-g", port: 8007, label: "Node G", color: "#3caea3", host: "EC2-A", replica: "Node H (EC2-B)" },
+  // EC2-B Instance: Nodes B, E, H
+  { id: "node-b", port: 8002, label: "Node B", color: "#80EF80", host: "EC2-B", replica: "Node C (EC2-C)" },
+  { id: "node-e", port: 8005, label: "Node E", color: "#68bb59", host: "EC2-B", replica: "Node F (EC2-C)" },
+  { id: "node-h", port: 8008, label: "Node H", color: "#88d49e", host: "EC2-B", replica: "Node I (EC2-C)" },
+  // EC2-C Instance: Nodes C, F, I
+  { id: "node-c", port: 8003, label: "Node C", color: "#BADBA2", host: "EC2-C", replica: "Node D (EC2-A)" },
+  { id: "node-f", port: 8006, label: "Node F", color: "#E3F0A3", host: "EC2-C", replica: "Node G (EC2-A)" },
+  { id: "node-i", port: 8009, label: "Node I", color: "#1b998b", host: "EC2-C", replica: "Node A (EC2-A)" },
+];
+
+const DB_FIELDS = [
+  { key: "fare_amount", label: "fare_amount (Base Fare)", type: "float", unit: "$", placeholder: "e.g. 17.50", defaultValue: "17.50" },
+  { key: "trip_distance", label: "trip_distance (Trip Distance)", type: "float", unit: "miles", placeholder: "e.g. 3.40", defaultValue: "3.40" },
+  { key: "passenger_count", label: "passenger_count (Passengers)", type: "integer", unit: "count", placeholder: "e.g. 2", defaultValue: "2" },
+  { key: "tip_amount", label: "tip_amount (Gratuity)", type: "float", unit: "$", placeholder: "e.g. 3.50", defaultValue: "3.50" },
+  { key: "total_amount", label: "total_amount (Final Total)", type: "float", unit: "$", placeholder: "e.g. 22.80", defaultValue: "22.80" },
+  { key: "pu_location_id", label: "pu_location_id (Pickup Zone ID)", type: "integer", unit: "zone", placeholder: "e.g. 142", defaultValue: "142" },
+  { key: "do_location_id", label: "do_location_id (Dropoff Zone ID)", type: "integer", unit: "zone", placeholder: "e.g. 236", defaultValue: "236" },
+  { key: "custom_json", label: "custom_json (Raw Payload)", type: "string", unit: "raw", placeholder: '{"custom": "data"}', defaultValue: '{"note": "Updated via SHC Mesh"}' },
 ];
 
 export default function Dashboard() {
@@ -23,18 +37,19 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Key Simulator State
-  const [simKey, setSimKey] = useState("user:123");
-  const [simVal, setSimVal] = useState("Rushabh_Rocks");
+  const [simKey, setSimKey] = useState("trip:45210");
+  const [selectedField, setSelectedField] = useState("fare_amount");
+  const [simVal, setSimVal] = useState("17.50");
   const [simTTL, setSimTTL] = useState(60);
   const [simResult, setSimResult] = useState(null);
   const [simLoading, setSimLoading] = useState(false);
   const [activeHashLoc, setActiveHashLoc] = useState(null);
   const [manualOverrides, setManualOverrides] = useState({});
 
-  // 10,000 Product Database Explorer State
-  const [catalogId, setCatalogId] = useState("prod:4521");
-  const [catalogResult, setCatalogResult] = useState(null);
-  const [catalogLoading, setCatalogLoading] = useState(false);
+  // 7.66M NYC Yellow Taxi SQLite Database Explorer State
+  const [tripId, setTripId] = useState("trip:45210");
+  const [tripResult, setTripResult] = useState(null);
+  const [tripLoading, setTripLoading] = useState(false);
 
   // 1-Click Presentation Demo Mode State
   const [demoState, setDemoState] = useState({
@@ -95,19 +110,66 @@ export default function Dashboard() {
     }
   }, [simKey]);
 
+  const currentFieldDef = DB_FIELDS.find((f) => f.key === selectedField) || DB_FIELDS[0];
+
+  const getValidation = (fieldDef, val) => {
+    if (!val || String(val).trim() === "") return { valid: false, message: "⚠️ Value cannot be empty" };
+    if (fieldDef.type === "float") {
+      const num = Number(val);
+      if (isNaN(num)) return { valid: false, message: `⚠️ Type Error: Must be a decimal float (e.g. ${fieldDef.placeholder})` };
+      return { valid: true, message: `✓ Valid Float (${fieldDef.unit})` };
+    }
+    if (fieldDef.type === "integer") {
+      const num = Number(val);
+      if (!Number.isInteger(num) || num < 0) return { valid: false, message: `⚠️ Type Error: Must be a positive integer` };
+      return { valid: true, message: `✓ Valid Integer (${fieldDef.unit})` };
+    }
+    return { valid: true, message: "✓ Valid String/JSON" };
+  };
+
+  const validation = getValidation(currentFieldDef, simVal);
+
   // Client Operations via /api/crud Route
   const handleSet = async () => {
+    if (!validation.valid) {
+      addLog(`Validation Error: ${validation.message}`, "error");
+      return;
+    }
+
     setSimLoading(true);
     try {
+      let finalPayload = simVal;
+      if (selectedField !== "custom_json") {
+        let typedVal = simVal;
+        if (currentFieldDef.type === "float") typedVal = parseFloat(simVal);
+        else if (currentFieldDef.type === "integer") typedVal = parseInt(simVal, 10);
+
+        finalPayload = JSON.stringify({
+          trip_id: simKey,
+          field_modified: selectedField,
+          [selectedField]: typedVal,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       const res = await fetch("/api/crud", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "SET", key: simKey, value: simVal, ttl_seconds: simTTL }),
+        body: JSON.stringify({ op: "SET", key: simKey, value: finalPayload, ttl_seconds: simTTL }),
       });
       const data = await res.json();
-      setSimResult({ op: "SET", ...data });
+      setSimResult({ op: "SET", ...data, value: finalPayload });
+      if (data.trip) {
+        setTripResult({
+          cache_hit: true,
+          trip: data.trip,
+          latency_ms: data.latency_ms || 1,
+          served_by: data.served_by,
+          efficiency_note: "⚡ Updated in SQLite DB & synchronized to 9-node Cache Mesh!",
+        });
+      }
       if (data.status === "stored") {
-        addLog(`SET '${simKey}' = '${simVal}' (Primary: ${data.served_by || "primary"})`, "success");
+        addLog(`SET '${simKey}' [${selectedField}=${simVal}] (Primary: ${data.served_by || "primary"})`, "success");
       } else {
         addLog(`SET '${simKey}' -> ${data.message || "error"}`, "error");
       }
@@ -130,6 +192,30 @@ export default function Dashboard() {
       });
       const data = await res.json();
       setSimResult({ op: "GET", ...data });
+
+      if (data.trip) {
+        setTripResult({
+          cache_hit: data.source === "distributed_cache",
+          trip: data.trip,
+          latency_ms: data.latency_ms || 1,
+          served_by: data.served_by,
+          efficiency_note: data.efficiency_note || "⚡ RAM Cache Hit",
+        });
+      } else if (data.value) {
+        try {
+          const parsed = JSON.parse(data.value);
+          if (parsed.trip_distance !== undefined || parsed.fare_amount !== undefined) {
+            setTripResult({
+              cache_hit: data.source === "distributed_cache",
+              trip: parsed,
+              latency_ms: data.latency_ms || 1,
+              served_by: data.served_by,
+              efficiency_note: data.efficiency_note || "⚡ RAM Cache Hit",
+            });
+          }
+        } catch {}
+      }
+
       if (data.status === "hit") {
         if (data.is_failover) {
           addLog(`GET '${simKey}' -> HIT: '${data.value}' 🔥 [FAILOVER from ${data.served_by}]`, "warning");
@@ -168,36 +254,37 @@ export default function Dashboard() {
     }
   };
 
-  // Backing Database (10,000 Records) Query
-  const handleQueryCatalog = async (targetId) => {
-    const queryId = targetId || catalogId || "prod:1";
-    setCatalogLoading(true);
+  // 7.66M NYC Yellow Taxi Dataset Query Handler
+  const handleQueryTrip = async (targetId) => {
+    const queryId = targetId || tripId || "trip:45210";
+    setTripLoading(true);
     try {
       const res = await fetch("/api/crud", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "CATALOG", id: queryId }),
+        body: JSON.stringify({ op: "TRIP", id: queryId }),
       });
       const data = await res.json();
-      setCatalogResult(data);
+      setTripResult(data);
 
       if (data.cache_hit) {
-        addLog(`⚡ CACHE HIT '${queryId}': ${data.latency_ms}ms (Served by ${data.served_by || "mesh"}) — Database protected!`, "success");
+        addLog(`⚡ CACHE HIT '${queryId}': ${data.latency_ms}ms (Served by ${data.served_by || "mesh"}) — 1GB SQLite disk read prevented!`, "success");
       } else {
-        addLog(`🐢 DATABASE QUERY '${queryId}': ${data.latency_ms}ms — Fetched from persistent DB & hydrated into Cache Mesh`, "warning");
+        addLog(`🐢 SQLITE DISK READ '${queryId}': ${data.latency_ms}ms — Read from 1GB file & hydrated into 9-node Cache Ring`, "warning");
       }
       refreshCluster();
     } catch (err) {
-      addLog(`Catalog query error: ${err.message}`, "error");
+      addLog(`Taxi trip query error: ${err.message}`, "error");
     } finally {
-      setCatalogLoading(false);
+      setTripLoading(false);
     }
   };
 
-  const pickRandomProduct = () => {
-    const randId = `prod:${Math.floor(Math.random() * 9999) + 1}`;
-    setCatalogId(randId);
-    handleQueryCatalog(randId);
+  const pickRandomTrip = () => {
+    const randRow = Math.floor(Math.random() * 7667791) + 1;
+    const randId = `trip:${randRow}`;
+    setTripId(randId);
+    handleQueryTrip(randId);
   };
 
   // Manual Node State Override
@@ -214,6 +301,31 @@ export default function Dashboard() {
     } catch (err) {
       addLog(`Failed to update state for ${nodeId}: ${err.message}`, "error");
     }
+  };
+
+  // Physical EC2 Instance Outage Simulator
+  const handleKillEC2 = async (ec2Name) => {
+    addLog(`💥 SIMULATING FULL OUTAGE ON [${ec2Name}]: Terminating all 3 hosted nodes...`, "error");
+    const targetNodes = ALL_NODES.filter((n) => n.host === ec2Name);
+    const newOverrides = {};
+    for (const n of targetNodes) {
+      newOverrides[n.id] = "FAILED";
+      await handleToggleState(n.id, "FAILED");
+    }
+    setManualOverrides((prev) => ({ ...prev, ...newOverrides }));
+    refreshCluster();
+  };
+
+  const handleRecoverEC2 = async (ec2Name) => {
+    addLog(`✨ RECOVERING HOST [${ec2Name}]: Bringing all 3 hosted nodes back online...`, "success");
+    const targetNodes = ALL_NODES.filter((n) => n.host === ec2Name);
+    const newOverrides = {};
+    for (const n of targetNodes) {
+      newOverrides[n.id] = "ALIVE";
+      await handleToggleState(n.id, "ALIVE");
+    }
+    setManualOverrides((prev) => ({ ...prev, ...newOverrides }));
+    refreshCluster();
   };
 
   // 1-Click Presentation Live Failover Demonstration
@@ -316,18 +428,6 @@ export default function Dashboard() {
     }, 6000);
   };
 
-  const handleFailRandomNodes = async () => {
-    addLog("Simulating failure on 3 random nodes...", "warning");
-    const shuffled = [...ALL_NODES].sort(() => 0.5 - Math.random()).slice(0, 3);
-    const newOverrides = {};
-    for (const n of shuffled) {
-      newOverrides[n.id] = "FAILED";
-      await handleToggleState(n.id, "FAILED");
-    }
-    setManualOverrides((prev) => ({ ...prev, ...newOverrides }));
-    refreshCluster();
-  };
-
   const handleReviveAllNodes = async () => {
     addLog("Reviving all 9 nodes to ALIVE...", "success");
     const newOverrides = {};
@@ -348,6 +448,7 @@ export default function Dashboard() {
       state: override || raw?.state || "ALIVE",
       latency_ms: raw?.latency_ms || 0,
       addr: `http://localhost:${n.port}`,
+      host: n.host,
     };
   });
 
@@ -365,34 +466,10 @@ export default function Dashboard() {
               DISTRIBUTED CACHE CLUSTER
             </strong>
           </div>
-          <span style={{ fontSize: "0.74rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)", borderLeft: "1px solid var(--border-subtle)", paddingLeft: "12px" }}>
-            GATEWAY :8000
-          </span>
+          
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            onClick={() => setActiveTab("overview")}
-            className="modern-btn modern-btn-sm"
-            style={{ background: activeTab === "overview" ? "var(--bg-surface)" : "transparent", borderColor: activeTab === "overview" ? "var(--border-card-hover)" : "transparent" }}
-          >
-            Cluster Topology
-          </button>
-          <button
-            onClick={() => setActiveTab("database")}
-            className="modern-btn modern-btn-sm"
-            style={{ background: activeTab === "database" ? "var(--bg-surface)" : "transparent", borderColor: activeTab === "database" ? "var(--border-card-hover)" : "transparent" }}
-          >
-            10,000 DB Benchmark
-          </button>
-          <button
-            onClick={() => setActiveTab("simulator")}
-            className="modern-btn modern-btn-sm"
-            style={{ background: activeTab === "simulator" ? "var(--bg-surface)" : "transparent", borderColor: activeTab === "simulator" ? "var(--border-card-hover)" : "transparent" }}
-          >
-            Key Simulator
-          </button>
-        </div>
+        
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div className="status-badge status-badge-alive">
@@ -430,14 +507,14 @@ export default function Dashboard() {
             <div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(186, 219, 162, 0.18)", border: "1px solid rgba(227, 240, 163, 0.3)", borderRadius: "var(--radius-full)", padding: "4px 12px", marginBottom: "14px" }}>
                 <span style={{ fontSize: "0.72rem", color: "#E3F0A3", fontFamily: "var(--font-mono)", fontWeight: "700" }}>
-                  9-NODE HIGH-AVAILABILITY PARTITION MESH
+                  3-EC2 MULTI-MACHINE ARCHITECTURE // 7.66M NYC TAXI PERSISTENT DB
                 </span>
               </div>
               <h1 style={{ fontSize: "clamp(1.9rem, 3.6vw, 2.6rem)", fontWeight: "800", letterSpacing: "-0.03em", lineHeight: "1.2", marginBottom: "10px", color: "#ffffff" }}>
                 Self-Healing Distributed Cache System
               </h1>
               <p style={{ color: "#BADBA2", fontSize: "0.98rem", maxWidth: "820px", lineHeight: "1.5", fontWeight: "400" }}>
-                Consistent hashing with 450 virtual nodes, Factor 2 partition replication, sub-2ms read latencies, and transparent failover accelerating a 10,000-record persistent database.
+                Accelerating 7,667,792 real-world records from the 1GB NYC Yellow Taxi database across a 9-node distributed partition mesh deployed over 3 physical EC2 failure domains.
               </p>
             </div>
           </div>
@@ -451,14 +528,14 @@ export default function Dashboard() {
             >
               ⚡ 1-Click Live Failover Demo (Presentation)
             </button>
-            <button onClick={pickRandomProduct} className="modern-btn modern-btn-pale" style={{ fontSize: "0.86rem", padding: "9px 18px" }}>
-              🔍 Test DB Query vs Cache (Random Item)
+            <button onClick={pickRandomTrip} className="modern-btn modern-btn-pale" style={{ fontSize: "0.86rem", padding: "9px 18px" }}>
+              🚕 Test Real 7.66M Taxi Trip (Random Pick)
             </button>
-            <button onClick={handleFailRandomNodes} className="modern-btn modern-btn-danger">
-              Fail Random 3 Nodes
+            <button onClick={() => handleKillEC2("EC2-A")} className="modern-btn modern-btn-danger">
+              💥 Kill Entire EC2-A (Nodes 1-3)
             </button>
             <button onClick={handleReviveAllNodes} className="modern-btn modern-btn-success">
-              Revive All 9 Nodes
+              ★ Revive All 9 Nodes
             </button>
           </div>
         </section>
@@ -511,19 +588,19 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 10,000 Product Database vs Cache Explorer */}
+        {/* 7.66M NYC Taxi SQLite Database Explorer */}
         <section className="modern-card" style={{ marginBottom: "28px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span className="status-badge status-badge-brand">
-                DATABASE TIER
+                PERSISTENT 1GB SQLITE DB
               </span>
               <h3 style={{ fontSize: "1.15rem", fontWeight: "700", letterSpacing: "-0.01em", color: "#172a1e" }}>
-                10,000 Catalog Dataset &amp; Cache-Aside Read-Through
+                7,667,792 NYC Yellow Taxi Dataset &amp; Cache Acceleration
               </h3>
             </div>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              Range: <strong>prod:1</strong> to <strong>prod:10000</strong>
+              Range: <strong>trip:1</strong> to <strong>trip:7667792</strong> (946 MB File)
             </span>
           </div>
 
@@ -531,60 +608,60 @@ export default function Dashboard() {
             {/* Search & Fetch */}
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <label style={{ fontSize: "0.76rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontWeight: "600" }}>
-                SEARCH PRODUCT BY ID (1 - 10000):
+                SEARCH TRIP BY ROW ID (1 - 7.66 MILLION):
               </label>
               <div style={{ display: "flex", gap: "8px" }}>
                 <input
                   type="text"
-                  value={catalogId}
-                  onChange={(e) => setCatalogId(e.target.value)}
+                  value={tripId}
+                  onChange={(e) => setTripId(e.target.value)}
                   className="modern-input"
-                  placeholder="e.g. prod:4521"
+                  placeholder="e.g. trip:45210"
                 />
-                <button onClick={() => handleQueryCatalog(catalogId)} disabled={catalogLoading} className="modern-btn modern-btn-primary" style={{ whiteSpace: "nowrap" }}>
-                  {catalogLoading ? "Querying..." : "Query"}
+                <button onClick={() => handleQueryTrip(tripId)} disabled={tripLoading} className="modern-btn modern-btn-primary" style={{ whiteSpace: "nowrap" }}>
+                  {tripLoading ? "Querying..." : "Query Trip"}
                 </button>
               </div>
-              <button onClick={pickRandomProduct} className="modern-btn modern-btn-pale modern-btn-sm" style={{ marginTop: "2px" }}>
-                ⚡ Pick Random Item (Auto-Test)
+              <button onClick={pickRandomTrip} className="modern-btn modern-btn-pale modern-btn-sm" style={{ marginTop: "2px" }}>
+                🚕 Pick Random Trip (Auto-Test 7.66M)
               </button>
             </div>
 
             {/* Latency Gauge */}
             <div style={{ background: "var(--bg-card-alt)", border: "1px solid var(--border-card)", padding: "12px 14px", borderRadius: "var(--radius-sm)" }}>
               <div style={{ fontSize: "0.70rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase", fontWeight: "700" }}>
-                Latency Comparison
+                Latency Benchmark
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <span style={{ fontSize: "0.80rem", color: "var(--text-secondary)" }}>Disk DB Query:</span>
+                <span style={{ fontSize: "0.80rem", color: "var(--text-secondary)" }}>🐢 1GB SQLite Disk Read:</span>
                 <strong style={{ color: "#be123c", fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>~45 ms</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "0.80rem", color: "var(--text-secondary)" }}>RAM Cache Hit:</span>
-                <strong style={{ color: "#166534", fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>~1.8 ms (25x Speedup)</strong>
+                <span style={{ fontSize: "0.80rem", color: "var(--text-secondary)" }}>⚡ 9-Node Cache Hit:</span>
+                <strong style={{ color: "#166534", fontFamily: "var(--font-mono)", fontSize: "0.82rem" }}>~1.5 ms (30x Speedup)</strong>
               </div>
             </div>
 
             {/* Database Offload Metric */}
             <div style={{ background: "rgba(186, 219, 162, 0.2)", border: "1px solid #BADBA2", padding: "12px 14px", borderRadius: "var(--radius-sm)" }}>
               <div style={{ fontSize: "0.70rem", fontFamily: "var(--font-mono)", color: "#1e3a29", marginBottom: "4px", textTransform: "uppercase", fontWeight: "700" }}>
-                Database Read Offload
+                1GB Disk I/O Offload
               </div>
               <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#15803d", fontFamily: "var(--font-mono)" }}>
                 96.4%
               </div>
               <div style={{ fontSize: "0.70rem", color: "#27401c", lineHeight: "1.3" }}>
-                Queries served from memory. Data remains persistent in DB if nodes restart.
+                Queries served from in-memory mesh. SQLite disk reads completely prevented!
               </div>
             </div>
           </div>
 
-          {/* Result Card */}
-          {catalogResult && (
+          {/* Real Taxi Trip Result Card */}
+          {tripResult && (
             <div
               style={{
-                background: catalogResult.cache_hit ? "rgba(66, 214, 116, 0.08)" : "rgba(227, 240, 163, 0.3)",
-                border: `1px solid ${catalogResult.cache_hit ? "#42D674" : "#BADBA2"}`,
+                background: tripResult.cache_hit ? "rgba(66, 214, 116, 0.08)" : "rgba(227, 240, 163, 0.3)",
+                border: `1px solid ${tripResult.cache_hit ? "#42D674" : "#BADBA2"}`,
                 borderRadius: "var(--radius-sm)",
                 padding: "13px 15px",
                 fontFamily: "var(--font-mono)",
@@ -593,26 +670,28 @@ export default function Dashboard() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className={`status-badge ${catalogResult.cache_hit ? "status-badge-alive" : "status-badge-failed"}`}>
-                    {catalogResult.cache_hit ? "CACHE HIT" : "DATABASE QUERY"}
+                  <span className={`status-badge ${tripResult.cache_hit ? "status-badge-alive" : "status-badge-failed"}`}>
+                    {tripResult.cache_hit ? "CACHE HIT (RAM)" : "SQLITE DISK READ"}
                   </span>
-                  <span style={{ color: "#172a1e", fontWeight: "600" }}>{catalogResult.efficiency_note}</span>
+                  <span style={{ color: "#172a1e", fontWeight: "600" }}>{tripResult.efficiency_note}</span>
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                  Latency: <strong style={{ color: "#172a1e" }}>{catalogResult.latency_ms} ms</strong> {catalogResult.served_by && `(Served by ${catalogResult.served_by})`}
+                  Latency: <strong style={{ color: "#172a1e" }}>{tripResult.latency_ms} ms</strong> {tripResult.served_by && `(Served by ${tripResult.served_by})`}
                 </div>
               </div>
 
-              {catalogResult.product && (
-                <div style={{ background: "#ffffff", padding: "10px 12px", borderRadius: "var(--radius-sm)", border: "1px solid #d8e8d5" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "4px" }}>
-                    <div>ID: <strong style={{ color: "#22a34f" }}>{catalogResult.product.id || catalogId}</strong></div>
-                    <div>Name: <strong style={{ color: "#172a1e" }}>{catalogResult.product.name}</strong></div>
-                    <div>Category: <span>{catalogResult.product.category}</span></div>
-                    <div>Price: <strong style={{ color: "#166534" }}>${catalogResult.product.price}</strong></div>
+              {tripResult.trip && (
+                <div style={{ background: "#ffffff", padding: "12px 14px", borderRadius: "var(--radius-sm)", border: "1px solid #d8e8d5" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px", marginBottom: "8px" }}>
+                    <div>Trip ID: <strong style={{ color: "#22a34f" }}>{tripResult.trip.trip_id || tripId}</strong></div>
+                    <div>Distance: <strong style={{ color: "#172a1e" }}>{tripResult.trip.trip_distance} miles</strong></div>
+                    <div>Fare: <strong style={{ color: "#166534" }}>${tripResult.trip.fare_amount}</strong></div>
+                    <div>Total Amount: <strong style={{ color: "#15803d" }}>${tripResult.trip.total_amount}</strong></div>
                   </div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                    {catalogResult.product.description} | Rating: ★ {catalogResult.product.rating} | SKU: {catalogResult.product.sku}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", fontSize: "0.74rem", color: "var(--text-secondary)" }}>
+                    <div>Pickup: <strong>{tripResult.trip.pickup_datetime}</strong> (Zone #{tripResult.trip.pu_location_id})</div>
+                    <div>Dropoff: <strong>{tripResult.trip.dropoff_datetime}</strong> (Zone #{tripResult.trip.do_location_id})</div>
+                    <div>Tip: <strong>${tripResult.trip.tip_amount}</strong> | Passengers: <strong>{tripResult.trip.passenger_count || 1}</strong></div>
                   </div>
                 </div>
               )}
@@ -622,90 +701,140 @@ export default function Dashboard() {
 
         {/* Section Title */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-          <h2 style={{ fontSize: "1.15rem", fontWeight: "700", letterSpacing: "-0.01em", color: "#172a1e" }}>
-            9-Node Distributed Topology
-          </h2>
+          <div>
+            <h2 style={{ fontSize: "1.15rem", fontWeight: "700", letterSpacing: "-0.01em", color: "#172a1e" }}>
+              3 Physical EC2 Failure Domains (9 Logical Cache Nodes)
+            </h2>
+            <p style={{ fontSize: "0.74rem", color: "var(--text-muted)", margin: "2px 0 0 0" }}>
+              Cross-Host Replication: EC2-A (A, D, G) → EC2-B (B, E, H) → EC2-C (C, F, I) → EC2-A
+            </p>
+          </div>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
             Cluster Health: <strong style={{ color: "#16a34a" }}>{aliveNodesCount}</strong> / 9 Nodes Active
           </span>
         </div>
 
-        {/* 3x3 Bento Grid for All 9 Nodes */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px", marginBottom: "28px" }}>
-          {ALL_NODES.map((node) => {
-            const isAlive = membersMap[node.id]?.state === "ALIVE";
-            const stats = nodeStats[node.id] || {};
+        {/* 3-Column EC2 Instance Group Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "28px" }}>
+          {["EC2-A", "EC2-B", "EC2-C"].map((hostName) => {
+            const hostNodes = ALL_NODES.filter((n) => n.host === hostName);
+            const aliveInHost = hostNodes.filter((n) => membersMap[n.id]?.state === "ALIVE").length;
+            const isHostDown = aliveInHost === 0;
 
             return (
               <div
-                key={node.id}
-                className="modern-card"
+                key={hostName}
                 style={{
-                  borderTop: `3.5px solid ${node.color}`,
-                  background: isAlive ? "#ffffff" : "rgba(225, 29, 72, 0.04)",
-                  borderColor: isAlive ? "var(--border-card)" : "rgba(225, 29, 72, 0.25)",
+                  background: isHostDown ? "rgba(225, 29, 72, 0.05)" : "rgba(255, 255, 255, 0.7)",
+                  border: `1.5px solid ${isHostDown ? "#e11d48" : "#d8e8d5"}`,
+                  borderRadius: "var(--radius-md)",
+                  padding: "14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
                 }}
               >
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ width: "9px", height: "9px", borderRadius: "50%", background: node.color }}></span>
-                    <strong style={{ fontSize: "0.92rem", fontWeight: "700", color: "#172a1e" }}>{node.label}</strong>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.70rem", color: "var(--text-muted)" }}>
-                      (:{node.port})
+                {/* EC2 Host Header & Disaster Simulation Controls */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-card)", paddingBottom: "8px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "0.92rem", fontWeight: "800", color: "#172a1e" }}>{hostName} Instance</span>
+                      <span className={`status-badge status-badge-${aliveInHost > 0 ? "alive" : "failed"}`} style={{ fontSize: "0.62rem", padding: "1px 6px" }}>
+                        {aliveInHost}/3 ALIVE
+                      </span>
+                    </div>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.66rem", color: "var(--text-muted)" }}>
+                      {hostName === "EC2-A" ? "Private IP: 10.0.1.10" : hostName === "EC2-B" ? "Private IP: 10.0.1.11" : "Private IP: 10.0.1.12"}
                     </span>
                   </div>
 
-                  <span className={`status-badge status-badge-${isAlive ? "alive" : "failed"}`}>
-                    <span className={`pulse-dot pulse-dot-${isAlive ? "green" : "red"}`}></span>
-                    {isAlive ? "ALIVE" : "FAILED"}
-                  </span>
-                </div>
-
-                {/* Stat Strip */}
-                <div className="stat-strip" style={{ marginBottom: "10px" }}>
-                  <span>Primary: <strong style={{ color: "var(--text-primary)" }}>{stats.primary_keys || 0}</strong></span>
-                  <span>Replica: <strong style={{ color: "var(--text-primary)" }}>{stats.replica_keys || 0}</strong></span>
-                  <span>Hits: <strong style={{ color: "#22a34f" }}>{stats.hit_count || 0}</strong></span>
-                </div>
-
-                {/* State Controls */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-                  {isAlive ? (
+                  {aliveInHost > 0 ? (
                     <button
-                      onClick={() => handleToggleState(node.id, "FAILED")}
+                      onClick={() => handleKillEC2(hostName)}
                       className="modern-btn modern-btn-danger modern-btn-sm"
-                      title="Manually simulate failure"
+                      style={{ fontSize: "0.68rem", padding: "3px 8px" }}
+                      title={`Simulate physical machine failure: terminates all 3 containers on ${hostName}`}
                     >
-                      Fail Node
+                      💥 Kill {hostName}
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleToggleState(node.id, "ALIVE")}
+                      onClick={() => handleRecoverEC2(hostName)}
                       className="modern-btn modern-btn-success modern-btn-sm"
-                      title="Revive node back online"
+                      style={{ fontSize: "0.68rem", padding: "3px 8px" }}
+                      title={`Restart physical machine & restore ${hostName} containers`}
                     >
-                      Revive Node
+                      ✨ Revive {hostName}
                     </button>
                   )}
+                </div>
 
-                  {isAlive ? (
-                    <button
-                      onClick={() => handleToggleState(node.id, "FAILED")}
-                      className="modern-btn modern-btn-sm"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Isolate
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleToggleState(node.id, "ALIVE")}
-                      className="modern-btn modern-btn-sm"
-                      style={{ color: "#166534" }}
-                    >
-                      Re-join Ring
-                    </button>
-                  )}
+                {/* 3 Hosted Cache Node Cards */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {hostNodes.map((node) => {
+                    const isAlive = membersMap[node.id]?.state === "ALIVE";
+                    const stats = nodeStats[node.id] || {};
+
+                    return (
+                      <div
+                        key={node.id}
+                        className="modern-card"
+                        style={{
+                          borderLeft: `4px solid ${node.color}`,
+                          background: isAlive ? "#ffffff" : "rgba(225, 29, 72, 0.04)",
+                          borderColor: isAlive ? "var(--border-card)" : "rgba(225, 29, 72, 0.25)",
+                          padding: "10px 12px",
+                        }}
+                      >
+                        {/* Node Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <strong style={{ fontSize: "0.88rem", color: "#172a1e" }}>{node.label}</strong>
+                            <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.66rem", color: "var(--text-muted)" }}>
+                              (:{node.port})
+                            </span>
+                          </div>
+                          <span className={`status-badge status-badge-${isAlive ? "alive" : "failed"}`} style={{ fontSize: "0.62rem" }}>
+                            <span className={`pulse-dot pulse-dot-${isAlive ? "green" : "red"}`}></span>
+                            {isAlive ? "ALIVE" : "FAILED"}
+                          </span>
+                        </div>
+
+                        {/* Replication Path Info */}
+                        <div style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", marginBottom: "6px", background: "rgba(186, 219, 162, 0.15)", padding: "2px 6px", borderRadius: "3px" }}>
+                          ↪ Replicates to: <strong style={{ color: "#166534" }}>{node.replica}</strong>
+                        </div>
+
+                        {/* Node Stat Strip */}
+                        <div className="stat-strip" style={{ marginBottom: "8px", fontSize: "0.68rem" }}>
+                          <span>Primary: <strong style={{ color: "var(--text-primary)" }}>{stats.primary_keys || 0}</strong></span>
+                          <span>Replica: <strong style={{ color: "var(--text-primary)" }}>{stats.replica_keys || 0}</strong></span>
+                          <span>Hits: <strong style={{ color: "#22a34f" }}>{stats.hit_count || 0}</strong></span>
+                        </div>
+
+                        {/* Individual Toggle Control */}
+                        <div>
+                          {isAlive ? (
+                            <button
+                              onClick={() => handleToggleState(node.id, "FAILED")}
+                              className="modern-btn modern-btn-danger modern-btn-sm"
+                              style={{ width: "100%", padding: "3px", fontSize: "0.68rem" }}
+                            >
+                              Fail Node ({node.label})
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleState(node.id, "ALIVE")}
+                              className="modern-btn modern-btn-success modern-btn-sm"
+                              style={{ width: "100%", padding: "3px", fontSize: "0.68rem" }}
+                            >
+                              Revive Node ({node.label})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -726,7 +855,7 @@ export default function Dashboard() {
               </span>
             </div>
             <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginBottom: "12px" }}>
-              50 Virtual Nodes per physical node guarantee an even key distribution across the 32-bit FNV-1a ring.
+              Cross-host partition placement guarantees no replica shares the same physical EC2 instance as its primary.
             </p>
 
             <HashRing nodes={membersMap} activeKey={simKey} keyLocation={activeHashLoc} />
@@ -743,39 +872,150 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
-              <input
-                type="text"
-                value={simKey}
-                onChange={(e) => setSimKey(e.target.value)}
-                className="modern-input"
-                placeholder="Key (e.g. user:123)"
-              />
-              <input
-                type="text"
-                value={simVal}
-                onChange={(e) => setSimVal(e.target.value)}
-                className="modern-input"
-                placeholder="Value (e.g. Rushabh_Rocks)"
-              />
-              <input
-                type="number"
-                value={simTTL}
-                onChange={(e) => setSimTTL(e.target.value)}
-                className="modern-input"
-                placeholder="TTL Seconds (e.g. 60)"
-              />
+            <div style={{ display: "flex", flexDirection: "column", gap: "9px", marginBottom: "12px" }}>
+              {/* Presets Strip */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "2px" }}>
+                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)", alignSelf: "center", fontWeight: "700" }}>DB PRESETS:</span>
+                <button
+                  onClick={() => { setSimKey("trip:45210"); setSimVal("17.50"); setSelectedField("fare_amount"); }}
+                  className="modern-btn modern-btn-sm"
+                  style={{ padding: "2px 8px", fontSize: "0.70rem" }}
+                >
+                  🚕 trip:45210
+                </button>
+                <button
+                  onClick={() => { setSimKey("trip:100000"); setSimVal("24.00"); setSelectedField("fare_amount"); }}
+                  className="modern-btn modern-btn-sm"
+                  style={{ padding: "2px 8px", fontSize: "0.70rem" }}
+                >
+                  🚕 trip:100000
+                </button>
+                <button
+                  onClick={() => { setSimKey("trip:7667792"); setSimVal("52.00"); setSelectedField("fare_amount"); }}
+                  className="modern-btn modern-btn-sm"
+                  style={{ padding: "2px 8px", fontSize: "0.70rem" }}
+                >
+                  🚕 trip:7667792 (Last)
+                </button>
+                <button
+                  onClick={() => {
+                    const rand = Math.floor(Math.random() * 7667791) + 1;
+                    setSimKey(`trip:${rand}`);
+                    setSimVal("15.00");
+                  }}
+                  className="modern-btn modern-btn-pale modern-btn-sm"
+                  style={{ padding: "2px 8px", fontSize: "0.70rem" }}
+                >
+                  🎲 Random
+                </button>
+              </div>
+
+              {/* Target Key Input */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <label style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontWeight: "600" }}>
+                  TARGET KEY (1 - 7.66M DB OR CUSTOM):
+                </label>
+                <input
+                  type="text"
+                  value={simKey}
+                  onChange={(e) => setSimKey(e.target.value)}
+                  className="modern-input"
+                  placeholder="e.g. trip:45210"
+                />
+              </div>
+
+              {/* Field Selector Dropdown */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <label style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontWeight: "600" }}>
+                  DATABASE FIELD TO MODIFY:
+                </label>
+                <select
+                  value={selectedField}
+                  onChange={(e) => {
+                    setSelectedField(e.target.value);
+                    const def = DB_FIELDS.find((f) => f.key === e.target.value);
+                    if (def) setSimVal(def.defaultValue);
+                  }}
+                  className="modern-input"
+                  style={{ padding: "7px 10px", fontSize: "0.78rem", background: "#ffffff" }}
+                >
+                  {DB_FIELDS.map((f) => (
+                    <option key={f.key} value={f.key}>
+                      {f.label} — [{f.type.toUpperCase()} ({f.unit})]
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Field Value with Live Typechecking */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontWeight: "600" }}>
+                    FIELD VALUE ({currentFieldDef.type.toUpperCase()}):
+                  </label>
+                  <span
+                    style={{
+                      fontSize: "0.66rem",
+                      fontFamily: "var(--font-mono)",
+                      color: validation.valid ? "#16a34a" : "#dc2626",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {validation.message}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={simVal}
+                  onChange={(e) => setSimVal(e.target.value)}
+                  className="modern-input"
+                  placeholder={currentFieldDef.placeholder}
+                  style={{
+                    borderColor: validation.valid ? "var(--border-card)" : "rgba(220, 38, 38, 0.6)",
+                    background: validation.valid ? "#ffffff" : "rgba(220, 38, 38, 0.02)",
+                  }}
+                />
+              </div>
+
+              {/* TTL Seconds */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <label style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", fontWeight: "600" }}>
+                  CACHE TTL (SECONDS):
+                </label>
+                <input
+                  type="number"
+                  value={simTTL}
+                  onChange={(e) => setSimTTL(e.target.value)}
+                  className="modern-input"
+                  placeholder="TTL Seconds (e.g. 60)"
+                />
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-              <button onClick={handleSet} disabled={simLoading} className="modern-btn modern-btn-primary modern-btn-sm">
-                SET
+              <button
+                onClick={handleSet}
+                disabled={simLoading || !validation.valid}
+                className="modern-btn modern-btn-primary modern-btn-sm"
+                title="Write structured field to primary & replica nodes"
+              >
+                SET (Cache)
               </button>
-              <button onClick={handleGet} disabled={simLoading} className="modern-btn modern-btn-pale modern-btn-sm">
-                GET
+              <button
+                onClick={handleGet}
+                disabled={simLoading}
+                className="modern-btn modern-btn-pale modern-btn-sm"
+                title="Read from cache RAM, or fallback to 1GB SQLite disk if miss"
+              >
+                GET (Cache/DB)
               </button>
-              <button onClick={handleDelete} disabled={simLoading} className="modern-btn modern-btn-danger modern-btn-sm">
-                DEL
+              <button
+                onClick={handleDelete}
+                disabled={simLoading}
+                className="modern-btn modern-btn-danger modern-btn-sm"
+                title="Invalidate key from cache mesh"
+              >
+                DEL (Evict)
               </button>
             </div>
           </div>

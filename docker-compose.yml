@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # PHYSICAL FAILURE DOMAIN 1: EC2-A (Nodes 1, 2, 3)
+  # ==========================================
+  node-a:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-a
+    environment:
+      - CACHE_NODE_ID=node-a
+      - PORT=8001
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8001:8001"
+    networks:
+      - cache-mesh-net
+
+  node-b:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-b
+    environment:
+      - CACHE_NODE_ID=node-b
+      - PORT=8002
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8002:8002"
+    networks:
+      - cache-mesh-net
+
+  node-c:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-c
+    environment:
+      - CACHE_NODE_ID=node-c
+      - PORT=8003
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8003:8003"
+    networks:
+      - cache-mesh-net
+
+  # ==========================================
+  # PHYSICAL FAILURE DOMAIN 2: EC2-B (Nodes 4, 5, 6)
+  # ==========================================
+  node-d:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-d
+    environment:
+      - CACHE_NODE_ID=node-d
+      - PORT=8004
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8004:8004"
+    networks:
+      - cache-mesh-net
+
+  node-e:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-e
+    environment:
+      - CACHE_NODE_ID=node-e
+      - PORT=8005
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8005:8005"
+    networks:
+      - cache-mesh-net
+
+  node-f:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-f
+    environment:
+      - CACHE_NODE_ID=node-f
+      - PORT=8006
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8006:8006"
+    networks:
+      - cache-mesh-net
+
+  # ==========================================
+  # PHYSICAL FAILURE DOMAIN 3: EC2-C (Nodes 7, 8, 9)
+  # ==========================================
+  node-g:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-g
+    environment:
+      - CACHE_NODE_ID=node-g
+      - PORT=8007
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-h=http://node-h:8008,node-i=http://node-i:8009
+    ports:
+      - "8007:8007"
+    networks:
+      - cache-mesh-net
+
+  node-h:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-h
+    environment:
+      - CACHE_NODE_ID=node-h
+      - PORT=8008
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-i=http://node-i:8009
+    ports:
+      - "8008:8008"
+    networks:
+      - cache-mesh-net
+
+  node-i:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-node-i
+    environment:
+      - CACHE_NODE_ID=node-i
+      - PORT=8009
+      - CACHE_HOST=0.0.0.0
+      - CACHE_PEERS=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008
+    ports:
+      - "8009:8009"
+    networks:
+      - cache-mesh-net
+
+  # ==========================================
+  # UNIFIED API GATEWAY ROUTER (:8000)
+  # ==========================================
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cache-gateway
+    entrypoint: ["/app/router"]
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - GATEWAY_NODES=node-a=http://node-a:8001,node-b=http://node-b:8002,node-c=http://node-c:8003,node-d=http://node-d:8004,node-e=http://node-e:8005,node-f=http://node-f:8006,node-g=http://node-g:8007,node-h=http://node-h:8008,node-i=http://node-i:8009
+      - SQLITE_PATH=/app/data/2019-01.sqlite
+    volumes:
+      - ./2019-01.sqlite:/app/data/2019-01.sqlite:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      - node-a
+      - node-b
+      - node-c
+      - node-d
+      - node-e
+      - node-f
+      - node-g
+      - node-h
+      - node-i
+    networks:
+      - cache-mesh-net
+
+  # ==========================================
+  # PISTACHIO DREAM NEXT.JS DASHBOARD (:3000)
+  # ==========================================
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: cache-dashboard
+    environment:
+      - PORT=3000
+      - GATEWAY_URL=http://gateway:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - cache-mesh-net
+
+networks:
+  cache-mesh-net:
+    driver: bridge

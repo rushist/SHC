@@ -16,7 +16,7 @@ import (
 func main() {
 	defaultPort := getEnvInt("PORT", 8000)
 	defaultHost := getEnv("HOST", "0.0.0.0")
-	defaultNodes := getEnv("GATEWAY_NODES", "node-a=http://localhost:8001,node-b=http://localhost:8002,node-c=http://localhost:8003,node-d=http://localhost:8004,node-e=http://localhost:8005,node-f=http://localhost:8006,node-g=http://localhost:8007,node-h=http://localhost:8008,node-i=http://localhost:8009")
+	defaultNodes := getEnv("GATEWAY_NODES", "node-a=http://127.0.0.1:8001,node-b=http://127.0.0.1:8002,node-c=http://127.0.0.1:8003,node-d=http://127.0.0.1:8004,node-e=http://127.0.0.1:8005,node-f=http://127.0.0.1:8006,node-g=http://127.0.0.1:8007,node-h=http://127.0.0.1:8008,node-i=http://127.0.0.1:8009")
 	defaultVNodes := getEnvInt("VNODES", 50)
 	defaultHeartbeat := getEnvDuration("HEARTBEAT_INTERVAL", 500*time.Millisecond)
 	defaultSuspect := getEnvDuration("SUSPECT_TIMEOUT", 1*time.Second)

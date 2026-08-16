@@ -18,3 +18,9 @@ build/
 # Temporary / Scratch files
 w.txt
 *.log
+
+# Databases & Large Files
+*.sqlite
+*.db
+*.sqlite3
+
