@@ -12,14 +12,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Self-Healing Distributed Cache Dashboard",
-  description: "Real-time interactive dashboard for consistent hashing, replication factor 2, heartbeat failure detection, and automatic failover.",
+  title: "SHC / Distributed Cache Console",
+  description: "Real-time interactive dashboard for consistent hashing, multi-machine failure domains, and cache acceleration.",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

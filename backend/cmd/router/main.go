@@ -14,8 +14,8 @@ import (
 )
 
 func main() {
-	defaultPort := getEnvInt("PORT", 8000)
-	defaultHost := getEnv("HOST", "0.0.0.0")
+	defaultPort := getFirstEnvInt([]string{"ROUTER_PORT", "PORT"}, 8000)
+	defaultHost := getFirstEnv([]string{"ROUTER_HOST", "HOST"}, "0.0.0.0")
 	defaultNodes := getFirstEnv([]string{"GATEWAY_NODES", "CACHE_NODES", "ALL_CACHE_NODES"}, "node-a=http://127.0.0.1:8001,node-b=http://127.0.0.1:8002,node-c=http://127.0.0.1:8003,node-d=http://127.0.0.1:8004,node-e=http://127.0.0.1:8005,node-f=http://127.0.0.1:8006,node-g=http://127.0.0.1:8007,node-h=http://127.0.0.1:8008,node-i=http://127.0.0.1:8009")
 	defaultVNodes := getEnvInt("VNODES", 50)
 	defaultHeartbeat := getEnvDuration("HEARTBEAT_INTERVAL", 500*time.Millisecond)
@@ -87,6 +87,17 @@ func getFirstEnv(keys []string, defaultVal string) string {
 	for _, k := range keys {
 		if val := os.Getenv(k); val != "" {
 			return val
+		}
+	}
+	return defaultVal
+}
+
+func getFirstEnvInt(keys []string, defaultVal int) int {
+	for _, k := range keys {
+		if val := os.Getenv(k); val != "" {
+			if i, err := strconv.Atoi(val); err == nil {
+				return i
+			}
 		}
 	}
 	return defaultVal
