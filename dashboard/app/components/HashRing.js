@@ -11,7 +11,7 @@ function fnv32a(str) {
   return hash >>> 0;
 }
 
-const NODE_COLORS = ["#315fc7", "#168b91", "#7662c7", "#d18b31", "#c45a70", "#4b8d69", "#61748f", "#a55d9a", "#458aa8"];
+const NODE_COLORS = ["#007eb9", "#5b5ea6", "#1d8102", "#ec7211", "#2b7c92", "#8c5a9e", "#4d7c0f", "#b45309", "#496a8f"];
 
 function polarPoint(center, radius, angle) {
   const rad = ((angle - 90) * Math.PI) / 180;
