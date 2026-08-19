@@ -23,7 +23,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: backend/go.sum
 
       - name: 🔨 1.3 Compile Go Backend (Router & Cache Nodes)
         run: |
@@ -40,8 +39,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: dashboard/package.json
 
       - name: 💻 1.5 Build Next.js 16 Production Dashboard
         run: |
@@ -49,7 +46,7 @@ jobs:
           echo "🚀 Building Next.js Dashboard & Documentation Portal"
           echo "========================================================"
           cd dashboard
-          npm ci
+          npm install
           npm run build
           echo "✅ Next.js production build completed successfully"
 
@@ -79,6 +76,9 @@ jobs:
           host: ${{ secrets.EC2_A_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-A: 10.0.1.10] Pulling Latest Git Commit & Rebuilding"
@@ -97,6 +97,9 @@ jobs:
           host: ${{ secrets.EC2_A_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
