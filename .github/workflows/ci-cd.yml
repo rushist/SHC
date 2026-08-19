@@ -35,10 +35,10 @@ jobs:
           go build -v ./cmd/node
           echo "✅ Go backend binaries compiled successfully with exit code 0"
 
-      - name: 📦 1.4 Setup Node.js 20 Runtime
+      - name: 📦 1.4 Setup Node.js 22 Runtime
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: 💻 1.5 Build Next.js 16 Production Dashboard
         run: |

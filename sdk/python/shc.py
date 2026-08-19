@@ -5,7 +5,7 @@ Zero third-party dependencies (uses standard requests).
 import requests
 
 class SHC:
-    def __init__(self, host="http://13.127.44.111:8000"):
+    def __init__(self, host="http://13.233.247.234:8000"):
         self.host = host.rstrip("/")
 
     def get(self, key: str):

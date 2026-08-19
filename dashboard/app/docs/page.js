@@ -17,7 +17,7 @@ const CODE_EXAMPLES = {
 import requests
 
 class SHC:
-    def __init__(self, host="http://13.127.44.111:8000"):
+    def __init__(self, host="http://13.233.247.234:8000"):
         self.host = host.rstrip("/")
 
     def get(self, key: str):
@@ -37,7 +37,7 @@ class SHC:
         return res.json()
 
 # --- Example Usage ---
-cache = SHC("http://13.127.44.111:8000")
+cache = SHC("http://13.233.247.234:8000")
 
 # 1. Write session
 cache.set("session:user_101", '{"user_id": 101, "role": "admin"}', ttl_seconds=3600)
@@ -50,7 +50,7 @@ print("Session payload:", user_session["value"])
 // Zero external dependencies (uses standard fetch)
 
 export class SHC {
-  constructor(private host = "http://13.127.44.111:8000") {}
+  constructor(private host = "http://13.233.247.234:8000") {}
 
   /** 1.2ms RAM read (auto-hydrates from RDS on cache miss) */
   async get(key: string) {
@@ -78,7 +78,7 @@ export class SHC {
 }
 
 // --- Example Usage ---
-const cache = new SHC("http://13.127.44.111:8000");
+const cache = new SHC("http://13.233.247.234:8000");
 
 // Write
 await cache.set("order:4021", JSON.stringify({ id: 4021, amount: 245.50 }));

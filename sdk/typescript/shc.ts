@@ -17,7 +17,7 @@ export interface SHCResponse {
 export class SHC {
   private host: string;
 
-  constructor(host = "http://13.127.44.111:8000") {
+  constructor(host = "http://13.233.247.234:8000") {
     this.host = host.replace(/\/$/, "");
   }
 
