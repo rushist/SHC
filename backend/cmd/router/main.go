@@ -16,7 +16,7 @@ import (
 func main() {
 	defaultPort := getEnvInt("PORT", 8000)
 	defaultHost := getEnv("HOST", "0.0.0.0")
-	defaultNodes := getEnv("GATEWAY_NODES", "node-a=http://127.0.0.1:8001,node-b=http://127.0.0.1:8002,node-c=http://127.0.0.1:8003,node-d=http://127.0.0.1:8004,node-e=http://127.0.0.1:8005,node-f=http://127.0.0.1:8006,node-g=http://127.0.0.1:8007,node-h=http://127.0.0.1:8008,node-i=http://127.0.0.1:8009")
+	defaultNodes := getFirstEnv([]string{"GATEWAY_NODES", "CACHE_NODES", "ALL_CACHE_NODES"}, "node-a=http://127.0.0.1:8001,node-b=http://127.0.0.1:8002,node-c=http://127.0.0.1:8003,node-d=http://127.0.0.1:8004,node-e=http://127.0.0.1:8005,node-f=http://127.0.0.1:8006,node-g=http://127.0.0.1:8007,node-h=http://127.0.0.1:8008,node-i=http://127.0.0.1:8009")
 	defaultVNodes := getEnvInt("VNODES", 50)
 	defaultHeartbeat := getEnvDuration("HEARTBEAT_INTERVAL", 500*time.Millisecond)
 	defaultSuspect := getEnvDuration("SUSPECT_TIMEOUT", 1*time.Second)
@@ -81,6 +81,15 @@ func main() {
 	if err := gw.Start(); err != nil && err.Error() != "http: Server closed" {
 		log.Fatalf("[Gateway] Server error: %v", err)
 	}
+}
+
+func getFirstEnv(keys []string, defaultVal string) string {
+	for _, k := range keys {
+		if val := os.Getenv(k); val != "" {
+			return val
+		}
+	}
+	return defaultVal
 }
 
 func getEnv(key, defaultVal string) string {
