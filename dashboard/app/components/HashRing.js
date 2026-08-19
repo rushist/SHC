@@ -2,7 +2,6 @@
 
 import React, { useMemo } from "react";
 
-// 32-bit FNV-1a hash matching backend Go implementation
 function fnv32a(str) {
   let hash = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -12,138 +11,70 @@ function fnv32a(str) {
   return hash >>> 0;
 }
 
+const NODE_COLORS = ["#315fc7", "#168b91", "#7662c7", "#d18b31", "#c45a70", "#4b8d69", "#61748f", "#a55d9a", "#458aa8"];
+
+function polarPoint(center, radius, angle) {
+  const rad = ((angle - 90) * Math.PI) / 180;
+  return { x: center + radius * Math.cos(rad), y: center + radius * Math.sin(rad) };
+}
+
+function arcPath(center, radius, start, end) {
+  const from = polarPoint(center, radius, start);
+  const to = polarPoint(center, radius, end);
+  const largeArc = end - start > 180 ? 1 : 0;
+  return `M ${from.x} ${from.y} A ${radius} ${radius} 0 ${largeArc} 1 ${to.x} ${to.y}`;
+}
+
 export default function HashRing({ nodes = {}, activeKey = "", keyLocation = null }) {
-  const size = 300;
+  const size = 340;
   const center = size / 2;
-  const radius = 105;
+  const radius = 112;
   const maxHash = 4294967295;
 
-  const vnodes = useMemo(() => {
-    const list = [];
-    const nodeEntries = Object.entries(nodes);
-
-    nodeEntries.forEach(([nodeId, info]) => {
-      const isFailed = info?.state === "FAILED";
-      
-      // 8 sample virtual tokens per node for clean visual mapping
-      for (let i = 0; i < 8; i++) {
-        const vnodeKey = `${nodeId}-vnode-${i}`;
-        const hash = fnv32a(vnodeKey);
-        const angle = (hash / maxHash) * 360;
-        const rad = ((angle - 90) * Math.PI) / 180;
-        const x = center + radius * Math.cos(rad);
-        const y = center + radius * Math.sin(rad);
-
-        list.push({
-          id: vnodeKey,
-          nodeId,
-          hash,
-          angle,
-          x,
-          y,
-          color: isFailed ? "#cbd5e1" : "#166534",
-          isFailed,
-        });
-      }
+  const vnodes = useMemo(() => Object.entries(nodes).flatMap(([nodeId, info], nodeIndex) => {
+    const color = NODE_COLORS[nodeIndex % NODE_COLORS.length];
+    return Array.from({ length: 8 }, (_, i) => {
+      const hash = fnv32a(`${nodeId}-vnode-${i}`);
+      const angle = (hash / maxHash) * 360;
+      return { id: `${nodeId}-vnode-${i}`, nodeId, hash, angle, point: polarPoint(center, radius, angle), color, isFailed: info?.state === "FAILED" };
     });
-
-    return list.sort((a, b) => a.angle - b.angle);
-  }, [nodes, center, radius, maxHash]);
+  }).sort((a, b) => a.angle - b.angle), [nodes, center, radius, maxHash]);
 
   const keyPos = useMemo(() => {
     if (!activeKey) return null;
     const hash = fnv32a(activeKey);
     const angle = (hash / maxHash) * 360;
-    const rad = ((angle - 90) * Math.PI) / 180;
-    return {
-      hash,
-      angle,
-      x: center + radius * Math.cos(rad),
-      y: center + radius * Math.sin(rad),
-    };
+    return { hash, angle, point: polarPoint(center, radius, angle) };
   }, [activeKey, center, radius, maxHash]);
 
+  const activeNode = keyLocation?.primary_node || "Awaiting route";
+  const activeColor = keyLocation?.primary_node ? NODE_COLORS[Object.keys(nodes).indexOf(keyLocation.primary_node) % NODE_COLORS.length] : "var(--text-muted)";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <div style={{ position: "relative", width: size, height: size }}>
-        <svg width={size} height={size}>
-          {/* Main Hash Ring Perimeter */}
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="#e2e8f0"
-            strokeWidth="2"
-            strokeDasharray="4 4"
-          />
-
-          {/* Virtual Node Points */}
-          {vnodes.map((v) => (
-            <circle
-              key={v.id}
-              cx={v.x}
-              cy={v.y}
-              r={v.isFailed ? 2.5 : 3.5}
-              fill={v.color}
-              opacity={v.isFailed ? 0.35 : 0.85}
-            />
-          ))}
-
-          {/* Active Key Routing Marker */}
-          {keyPos && (
-            <g>
-              <line
-                x1={center}
-                y1={center}
-                x2={keyPos.x}
-                y2={keyPos.y}
-                stroke="#0f172a"
-                strokeWidth="1.5"
-                strokeDasharray="2 2"
-              />
-              <circle
-                cx={keyPos.x}
-                cy={keyPos.y}
-                r={5.5}
-                fill="#0f172a"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              />
-            </g>
-          )}
+    <div className="hash-ring-wrap">
+      <div style={{ position: "relative", width: size, height: size, maxWidth: "100%" }}>
+        <svg viewBox={`0 0 ${size} ${size}`} width="100%" height="100%" role="img" aria-label="Consistent hash ring topology">
+          <circle cx={center} cy={center} r={radius + 16} fill="none" stroke="var(--border-default)" strokeWidth="1" />
+          <circle cx={center} cy={center} r={radius - 18} fill="var(--bg-surface-subtle)" stroke="var(--border-default)" strokeWidth="1" />
+          {Array.from({ length: 12 }, (_, i) => {
+            const point = polarPoint(center, radius + 16, i * 30);
+            return <line key={i} x1={center} y1={center} x2={point.x} y2={point.y} stroke="var(--border-default)" strokeWidth="1" opacity="0.45" />;
+          })}
+          {vnodes.map((v) => <circle key={v.id} cx={v.point.x} cy={v.point.y} r={v.isFailed ? 3 : 4.2} fill={v.isFailed ? "var(--text-dim)" : v.color} opacity={v.isFailed ? 0.42 : 0.95} stroke="var(--bg-surface)" strokeWidth="1.5" />)}
+          {Array.from({ length: 9 }, (_, i) => <path key={i} d={arcPath(center, radius + 8, i * 40, i * 40 + 35)} fill="none" stroke={NODE_COLORS[i]} strokeWidth="5" strokeLinecap="round" opacity={Object.values(nodes)[i]?.state === "FAILED" ? 0.25 : 0.72} />)}
+          {keyPos && <g><line x1={center} y1={center} x2={keyPos.point.x} y2={keyPos.point.y} stroke="var(--text-primary)" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.7" /><circle cx={keyPos.point.x} cy={keyPos.point.y} r="7" fill="var(--bg-surface)" stroke="var(--text-primary)" strokeWidth="2" /><circle cx={keyPos.point.x} cy={keyPos.point.y} r="3" fill="var(--text-primary)" /></g>}
         </svg>
-
-        {/* Center Ring Telemetry */}
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            textAlign: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Hash Ring
-          </div>
-          <div style={{ fontSize: "0.95rem", fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-            450 VNodes
-          </div>
-          {keyLocation?.primary_node && (
-            <div style={{ fontSize: "0.68rem", fontFamily: "var(--font-mono)", color: "var(--status-alive-text)", marginTop: "2px" }}>
-              Mapped: {keyLocation.primary_node}
-            </div>
-          )}
+        <div className="hash-ring-center">
+          <div className="hash-ring-kicker">Consistent hash</div>
+          <strong>450</strong>
+          <span>virtual tokens</span>
+          <small style={{ color: activeColor }}>{activeNode}</small>
         </div>
       </div>
-
-      {keyPos && (
-        <div style={{ marginTop: "4px", fontSize: "0.72rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-          Key: <span style={{ color: "var(--text-primary)" }}>{activeKey}</span> | FNV Hash: <span style={{ color: "var(--text-primary)" }}>{keyPos.hash}</span>
-        </div>
-      )}
+      <div className="hash-ring-legend">
+        {Object.keys(nodes).slice(0, 9).map((nodeId, i) => <span key={nodeId}><i style={{ background: NODE_COLORS[i] }} />{nodeId}</span>)}
+      </div>
+      {keyPos && <div className="hash-ring-key">Key <b>{activeKey}</b> · FNV-1a <b>{keyPos.hash}</b></div>}
     </div>
   );
 }
