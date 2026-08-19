@@ -1,0 +1,82 @@
+name: SHC CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ==========================================
+  # STAGE 1: Continuous Integration (Test & Build)
+  # ==========================================
+  ci:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: backend/go.sum
+
+      - name: Test & Build Go Backend
+        run: |
+          cd backend
+          go mod tidy
+          go build -v ./cmd/router
+          go build -v ./cmd/node
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package.json
+
+      - name: Build Next.js Dashboard
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+
+  # ==========================================
+  # STAGE 2: Continuous Deployment (Multi-EC2)
+  # ==========================================
+  deploy:
+    name: Deploy to AWS EC2 Cluster
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2-A (Gateway + Nodes A, D, G)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_A_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /app/shc
+            git pull origin main
+            docker build -t shc/backend:latest ./backend
+            docker build -t shc/dashboard:latest ./dashboard
+            docker compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
+            docker compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
+
+      - name: Deploy to EC2-B & EC2-C (via EC2-A Bastion)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_A_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Update EC2-B (10.0.1.11)
+            ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@10.0.1.11 "cd /app/shc && git pull origin main && docker build -t shc/backend:latest ./backend && docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate"
+            
+            # Update EC2-C (10.0.1.13)
+            ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@10.0.1.13 "cd /app/shc && git pull origin main && docker build -t shc/backend:latest ./backend && docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate"
