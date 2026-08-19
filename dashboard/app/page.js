@@ -143,8 +143,14 @@ export default function Dashboard() {
       setTripResult({ ...data, roundtrip_ms: elapsed });
       locateKey(targetId);
 
-      const hitType = data.cache_hit ? "CACHE HIT (RAM)" : "DATABASE READ";
-      addLog(`[Query] ${targetId} -> ${hitType} (${elapsed}ms)`, data.cache_hit ? "success" : "info");
+      let hitDetails = "";
+      if (data.cache_hit) {
+        const failoverTag = data.is_failover ? " [REPLICA FAILOVER]" : "";
+        hitDetails = `CACHE HIT (RAM: ${data.served_by || "cluster"}${failoverTag})`;
+      } else {
+        hitDetails = `DATABASE READ (Hydrated to Cache)`;
+      }
+      addLog(`[Query] ${targetId} -> ${hitDetails} (${elapsed}ms)`, data.cache_hit ? "success" : "info");
     } catch (err) {
       addLog(`[Query Error] ${targetId}: ${err.message}`, "error");
     } finally {
@@ -186,7 +192,8 @@ export default function Dashboard() {
       if (data.status === "error") {
         addLog(`[${op} Error] '${simKey}': ${data.message}`, "error");
       } else {
-        addLog(`[${op}] '${simKey}' (${elapsed}ms) -> ${data.status || "OK"}`, "success");
+        const nodeInfo = data.served_by ? ` [Node: ${data.served_by}${data.is_failover ? " (Replica)" : ""}]` : "";
+        addLog(`[${op}] '${simKey}' (${elapsed}ms)${nodeInfo} -> ${data.status || "OK"}`, "success");
       }
     } catch (err) {
       addLog(`[${op} Failed] ${err.message}`, "error");
