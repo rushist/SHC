@@ -29,5 +29,5 @@ COPY --from=builder /app/cachenode /app/cachenode
 COPY --from=builder /app/router /app/router
 COPY --from=builder /app/chaos /app/chaos
 
-# Default to running storage node
-ENTRYPOINT ["/app/cachenode"]
+# Default to running storage node (can be overridden by command/entrypoint)
+CMD ["/app/cachenode"]

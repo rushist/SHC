@@ -9,11 +9,11 @@ services:
     image: ${DOCKER_REGISTRY:-shc}/backend:latest
     container_name: shc-gateway-router
     restart: unless-stopped
-    command: ["/app/router"]
+    entrypoint: ["/app/router"]
     environment:
       - ROUTER_PORT=8000
       - ROUTER_HOST=0.0.0.0
-      - CACHE_NODES=${ALL_CACHE_NODES:-http://10.0.1.10:8001,http://10.0.1.10:8002,http://10.0.1.10:8003,http://10.0.1.11:8001,http://10.0.1.11:8002,http://10.0.1.11:8003,http://10.0.1.12:8001,http://10.0.1.12:8002,http://10.0.1.12:8003}
+      - CACHE_NODES=${ALL_CACHE_NODES:-http://10.0.1.10:8001,http://10.0.1.10:8002,http://10.0.1.10:8003,http://10.0.1.11:8001,http://10.0.1.11:8002,http://10.0.1.11:8003,http://10.0.1.13:8001,http://10.0.1.13:8002,http://10.0.1.13:8003}
       - DATABASE_URL=${DATABASE_URL}
       - DATABASE_HOST=${DATABASE_HOST}
       - DATABASE_PORT=${DATABASE_PORT:-5432}
