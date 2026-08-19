@@ -226,10 +226,11 @@ export default function Dashboard() {
 
   return (
     <div suppressHydrationWarning style={{ minHeight: "100vh", backgroundColor: "var(--bg-canvas)", color: "var(--text-primary)" }}>
-      {/* System Navigation Header */}
+      {/* AWS Console Navigation Header */}
       <header className="system-header">
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <div style={{ color: "#ff9900", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>AWS / EC2 / Mumbai</div>
             <div style={{ fontSize: "0.95rem", fontWeight: 700, letterSpacing: "-0.01em" }}>
               SHC / Self-Healing Distributed Cache
             </div>
@@ -260,9 +261,12 @@ export default function Dashboard() {
         {/* Section 1: Physical Failure Domains (3 EC2 Instances) */}
         <section>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <h2 style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-              Physical Failure Domains (3 EC2 Hosts)
-            </h2>
+            <div>
+              <div style={{ fontSize: "0.68rem", color: "var(--accent-brand)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "2px" }}>Cluster resources</div>
+              <h2 style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                Physical Failure Domains (3 EC2 Hosts)
+              </h2>
+            </div>
             <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
               Replication: Clockwise Ring (R=2) Across Physical AZs
             </div>
