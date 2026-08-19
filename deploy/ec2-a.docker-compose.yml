@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # EC2-A MANIFEST (Failure Domain 1): Nodes A, D, and G
 # Target Host: EC2-A (e.g. Private IP: 10.0.1.10)
@@ -8,9 +6,6 @@ version: '3.8'
 services:
   # Node A (Primary for A keys, Replicated to Node B on EC2-B)
   node-a:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
     image: ${DOCKER_REGISTRY:-shc}/backend:latest
     container_name: shc-node-a
     restart: unless-stopped

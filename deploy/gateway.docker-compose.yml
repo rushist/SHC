@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # GATEWAY & DASHBOARD MANIFEST (Public Ingress Tier)
 # Target Host: Public EC2 / Web Ingress Tier
@@ -8,9 +6,6 @@ version: '3.8'
 services:
   # Gateway Router (Port :8000)
   gateway-router:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
     image: ${DOCKER_REGISTRY:-shc}/backend:latest
     container_name: shc-gateway-router
     restart: unless-stopped
@@ -35,9 +30,6 @@ services:
 
   # Next.js Presentation Dashboard (Port :3000)
   dashboard:
-    build:
-      context: ../dashboard
-      dockerfile: Dockerfile
     image: ${DOCKER_REGISTRY:-shc}/dashboard:latest
     container_name: shc-dashboard
     restart: unless-stopped

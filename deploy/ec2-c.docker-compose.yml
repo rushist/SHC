@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # EC2-C MANIFEST (Failure Domain 3): Nodes C, F, and I
 # Target Host: EC2-C (e.g. Private IP: 10.0.1.12)

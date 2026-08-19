@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ==============================================================================
 # EC2-B MANIFEST (Failure Domain 2): Nodes B, E, and H
 # Target Host: EC2-B (e.g. Private IP: 10.0.1.11)
