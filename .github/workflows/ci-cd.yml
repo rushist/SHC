@@ -115,8 +115,11 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
             echo "========================================================"
-            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
-            git pull origin main
+            if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
+              mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
+            fi
+            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; fi
+            git pull origin main || true
             docker build -t shc/backend:latest ./backend
             if docker compose version >/dev/null 2>&1; then
               docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
@@ -141,8 +144,11 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Cross-Host Nodes C, F, I"
             echo "========================================================"
-            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
-            git pull origin main
+            if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
+              mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
+            fi
+            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; fi
+            git pull origin main || true
             docker build -t shc/backend:latest ./backend
             if docker compose version >/dev/null 2>&1; then
               docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
