@@ -575,15 +575,24 @@ func (g *Gateway) handleAPICluster(w http.ResponseWriter, r *http.Request) {
 	for _, n := range nodes {
 		state, _ := g.healthMonitor.GetNodeState(n.NodeID)
 		var latency int64 = 0
+		var primaryKeys, replicaKeys int = 0, 0
+		var hitCount uint64 = 0
+
 		if mInfo, ok := view.Members[n.NodeID]; ok {
 			latency = mInfo.LatencyMs
+			primaryKeys = mInfo.PrimaryKeys
+			replicaKeys = mInfo.ReplicaKeys
+			hitCount = mInfo.HitCount
 		}
 
 		nodeDetails[n.NodeID] = map[string]interface{}{
-			"node_id":    n.NodeID,
-			"addr":       n.Addr,
-			"state":      state,
-			"latency_ms": latency,
+			"node_id":      n.NodeID,
+			"addr":         n.Addr,
+			"state":        state,
+			"latency_ms":   latency,
+			"primary_keys": primaryKeys,
+			"replica_keys": replicaKeys,
+			"hit_count":    hitCount,
 		}
 	}
 

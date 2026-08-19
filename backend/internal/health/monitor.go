@@ -21,13 +21,17 @@ const (
 
 // MemberInfo describes the state and metadata of a single cluster node.
 type MemberInfo struct {
-	NodeID      string    `json:"node_id"`
-	Addr        string    `json:"addr"`
-	State       NodeState `json:"state"`
-	LatencyMs   int64     `json:"latency_ms"`
-	LastSeen    time.Time `json:"last_seen"`
-	MissedPings int       `json:"missed_pings"`
-	LastError   string    `json:"last_error,omitempty"`
+	NodeID         string    `json:"node_id"`
+	Addr           string    `json:"addr"`
+	State          NodeState `json:"state"`
+	LatencyMs      int64     `json:"latency_ms"`
+	PrimaryKeys    int       `json:"primary_keys"`
+	ReplicaKeys    int       `json:"replica_keys"`
+	HitCount       uint64    `json:"hit_count"`
+	ManualOverride bool      `json:"manual_override,omitempty"`
+	LastSeen       time.Time `json:"last_seen"`
+	MissedPings    int       `json:"missed_pings"`
+	LastError      string    `json:"last_error,omitempty"`
 }
 
 // ClusterView represents the complete membership snapshot returned by GET /cluster.
@@ -196,20 +200,18 @@ func (m *Monitor) SetNodeStateManual(nodeID string, newState NodeState) bool {
 	}
 
 	oldState := mem.State
-	if oldState == newState {
-		return true
-	}
-
 	mem.State = newState
 	if newState == StateAlive {
+		mem.ManualOverride = false
 		mem.LastSeen = time.Now()
 		mem.MissedPings = 0
 		mem.LastError = ""
 	} else if newState == StateFailed {
+		mem.ManualOverride = true
 		mem.LastError = "Manually marked FAILED by user via dashboard"
 	}
 
-	log.Printf("[Health] MANUAL OVERRIDE: Node %s state forced %s -> %s", nodeID, oldState, newState)
+	log.Printf("[Health] MANUAL OVERRIDE: Node %s state forced %s -> %s (ManualOverride: %v)", nodeID, oldState, newState, mem.ManualOverride)
 	m.notifyStateChange(nodeID, oldState, newState)
 	return true
 }
@@ -281,15 +283,18 @@ func (m *Monitor) pingPeer(peer *MemberInfo) {
 	}
 
 	var health struct {
-		NodeID string `json:"node_id"`
-		State  string `json:"state"`
+		NodeID      string `json:"node_id"`
+		State       string `json:"state"`
+		PrimaryKeys int    `json:"primary_keys"`
+		ReplicaKeys int    `json:"replica_keys"`
+		HitCount    uint64 `json:"hit_count"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&health)
 
-	m.recordSuccess(peer.NodeID, latency)
+	m.recordSuccess(peer.NodeID, latency, health.PrimaryKeys, health.ReplicaKeys, health.HitCount)
 }
 
-func (m *Monitor) recordSuccess(nodeID string, latency int64) {
+func (m *Monitor) recordSuccess(nodeID string, latency int64, pKeys, rKeys int, hits uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -298,12 +303,21 @@ func (m *Monitor) recordSuccess(nodeID string, latency int64) {
 		return
 	}
 
-	oldState := mem.State
-	mem.State = StateAlive
 	mem.LastSeen = time.Now()
 	mem.LatencyMs = latency
+	mem.PrimaryKeys = pKeys
+	mem.ReplicaKeys = rKeys
+	mem.HitCount = hits
 	mem.MissedPings = 0
 	mem.LastError = ""
+
+	// If node was manually marked FAILED for chaos testing, keep it FAILED until user clicks revive
+	if mem.ManualOverride && mem.State == StateFailed {
+		return
+	}
+
+	oldState := mem.State
+	mem.State = StateAlive
 
 	if oldState != StateAlive {
 		log.Printf("[Heartbeat] Node %s RECOVERED (State: %s -> ALIVE, latency: %dms)", nodeID, oldState, latency)

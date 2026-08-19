@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import HashRing from "./components/HashRing";
 
 const HOST_GROUPS = [
@@ -104,6 +105,12 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [isPolling, refreshCluster]);
 
+  useEffect(() => {
+    if (simKey) {
+      locateKey(simKey);
+    }
+  }, [simKey]);
+
   const locateKey = async (key) => {
     try {
       const res = await fetch("/api/crud", {
@@ -206,10 +213,9 @@ export default function Dashboard() {
   };
 
   const handleHostToggle = async (host, targetState) => {
-    addLog(`[Host Action] Setting ${host.hostId} (${host.nodes.map((n) => n.id).join(", ")}) -> ${targetState}...`, "warn");
-    for (const node of host.nodes) {
-      await handleNodeStateChange(node.id, targetState);
-    }
+    addLog(`[Host Action] Setting ${host.hostId} (${host.nodes.map((n) => n.id).join(", ")}) -> ${targetState}...`, targetState === "ALIVE" ? "success" : "warn");
+    await Promise.all(host.nodes.map((node) => handleNodeStateChange(node.id, targetState)));
+    refreshCluster();
   };
 
   const allActiveCount = Object.values(nodeStats).filter((s) => s.state !== "FAILED").length;
@@ -253,6 +259,9 @@ export default function Dashboard() {
           >
             {isPolling ? "Pause Polling" : "Resume Polling"}
           </button>
+          <Link href="/docs" className="sys-btn sys-btn-sm sys-btn-primary">
+            Documentation & SDKs
+          </Link>
         </div>
       </header>
 

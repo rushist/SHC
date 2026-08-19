@@ -497,6 +497,9 @@ func (s *Server) handleInternalHealth(w http.ResponseWriter, r *http.Request) {
 		NodeID:        s.config.NodeID,
 		State:         "ALIVE",
 		Addr:          addr,
+		PrimaryKeys:   stats.PrimaryKeys,
+		ReplicaKeys:   stats.ReplicaKeys,
+		HitCount:      stats.HitCount,
 		UptimeSeconds: stats.UptimeSeconds,
 	}
 

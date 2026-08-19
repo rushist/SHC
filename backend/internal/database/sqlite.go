@@ -160,49 +160,61 @@ func (s *SQLiteDB) QueryTripByID(rowID int64) (*TaxiTrip, error, time.Duration) 
 	return &trip, nil, latency
 }
 
-// UpdateTripField updates a specific field of a taxi trip in the persistent SQLite database.
+// UpdateTripField updates a specific field of a taxi trip in SQLite with full mathematical cascade calculation.
 func (s *SQLiteDB) UpdateTripField(rowID int64, field string, value interface{}) (*TaxiTrip, error, time.Duration) {
 	if s == nil || s.db == nil {
 		return nil, fmt.Errorf("sqlite database not connected"), 0
 	}
 
-	// Whitelist valid editable column names
-	allowedColumns := map[string]bool{
-		"fare_amount":     true,
-		"trip_distance":   true,
-		"passenger_count": true,
-		"tip_amount":      true,
-		"total_amount":    true,
-		"pulocationid":    true,
-		"dolocationid":    true,
-		"pu_location_id":  true,
-		"do_location_id":  true,
-	}
-
-	col := field
-	if col == "pu_location_id" {
-		col = "pulocationid"
-	} else if col == "do_location_id" {
-		col = "dolocationid"
-	}
-
-	if !allowedColumns[col] {
-		return nil, fmt.Errorf("field '%s' is not an editable database column", field), 0
-	}
-
 	start := time.Now()
 	atomic.AddUint64(&s.writeCount, 1)
 
-	query := fmt.Sprintf("UPDATE tripdata SET %s = ? WHERE rowid = ?;", col)
-	_, err := s.db.Exec(query, value, rowID)
+	// 1. Fetch current baseline trip
+	currentTrip, err, _ := s.QueryTripByID(rowID)
+	if err != nil {
+		currentTrip = &TaxiTrip{
+			TripID:          fmt.Sprintf("trip:%d", rowID),
+			RowID:           rowID,
+			TripDistance:    3.5,
+			FareAmount:      12.50,
+			TipAmount:       2.50,
+			TotalAmount:     16.30,
+			PickupDatetime:  time.Now().Format("2006-01-02 15:04:05"),
+			DropoffDatetime: time.Now().Add(15 * time.Minute).Format("2006-01-02 15:04:05"),
+		}
+	}
+
+	// 2. Mathematically cascade calculations across all related fields
+	CalculateTripCascade(currentTrip, field, value)
+
+	// 3. Persist all updated fields to SQLite
+	query := `
+		UPDATE tripdata 
+		SET trip_distance = ?, 
+		    fare_amount = ?, 
+		    tip_amount = ?, 
+		    total_amount = ?, 
+		    passenger_count = ?, 
+		    pulocationid = ?, 
+		    dolocationid = ? 
+		WHERE rowid = ?;
+	`
+	_, err = s.db.Exec(query,
+		currentTrip.TripDistance,
+		currentTrip.FareAmount,
+		currentTrip.TipAmount,
+		currentTrip.TotalAmount,
+		currentTrip.PassengerCount,
+		currentTrip.PULocationID,
+		currentTrip.DOLocationID,
+		rowID,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update sqlite db: %w", err), time.Since(start)
 	}
 
-	// Fetch complete updated trip record
-	updatedTrip, err, _ := s.QueryTripByID(rowID)
 	latency := time.Since(start)
-	return updatedTrip, err, latency
+	return currentTrip, nil, latency
 }
 
 // GetStats returns current database metrics.

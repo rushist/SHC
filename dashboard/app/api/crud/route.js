@@ -1,5 +1,54 @@
 import { NextResponse } from "next/server";
 
+function fnv32a(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return hash >>> 0;
+}
+
+const ALL_NODE_IDS = ["node-a", "node-b", "node-c", "node-d", "node-e", "node-f", "node-g", "node-h", "node-i"];
+
+function computeKeyRingLocation(key) {
+  if (!key) return { primary_node: "node-a", replica_node: "node-b" };
+
+  const tokens = [];
+  for (const nodeId of ALL_NODE_IDS) {
+    for (let i = 0; i < 50; i++) {
+      tokens.push({
+        hash: fnv32a(`${nodeId}-vnode-${i}`),
+        nodeId,
+      });
+    }
+  }
+  tokens.sort((a, b) => a.hash - b.hash);
+
+  const keyHash = fnv32a(key);
+  let primaryIndex = tokens.findIndex((t) => t.hash >= keyHash);
+  if (primaryIndex === -1) {
+    primaryIndex = 0;
+  }
+  const primaryNode = tokens[primaryIndex].nodeId;
+
+  let replicaNode = "node-b";
+  for (let i = 1; i < tokens.length; i++) {
+    const idx = (primaryIndex + i) % tokens.length;
+    if (tokens[idx].nodeId !== primaryNode) {
+      replicaNode = tokens[idx].nodeId;
+      break;
+    }
+  }
+
+  return {
+    key,
+    hash: keyHash,
+    primary_node: primaryNode,
+    replica_node: replicaNode,
+  };
+}
+
 async function gatewayFetch(path, options = {}) {
   const routerUrl = process.env.ROUTER_URL || "http://127.0.0.1:8000";
   const hosts = [routerUrl, "http://gateway-router:8000", "http://127.0.0.1:8000", "http://localhost:8000"];
@@ -91,7 +140,7 @@ export async function POST(request) {
     }
 
     if (op === "LOCATE") {
-      return NextResponse.json({ key, primary_node: "node-a", replica_node: "node-b" });
+      return NextResponse.json(computeKeyRingLocation(key));
     }
 
     return NextResponse.json({ error: "Invalid operation" }, { status: 400 });

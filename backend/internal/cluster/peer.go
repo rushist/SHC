@@ -15,6 +15,9 @@ type InternalHealth struct {
 	NodeID        string `json:"node_id"`
 	State         string `json:"state"`
 	Addr          string `json:"addr"`
+	PrimaryKeys   int    `json:"primary_keys"`
+	ReplicaKeys   int    `json:"replica_keys"`
+	HitCount      uint64 `json:"hit_count"`
 	UptimeSeconds int64  `json:"uptime_seconds"`
 }
 
