@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 
 async function gatewayFetch(path, options = {}) {
-  const hosts = ["http://127.0.0.1:8000", "http://localhost:8000"];
+  const routerUrl = process.env.ROUTER_URL || "http://127.0.0.1:8000";
+  const hosts = [routerUrl, "http://gateway-router:8000", "http://127.0.0.1:8000", "http://localhost:8000"];
+  
   for (const host of hosts) {
+    if (!host) continue;
     try {
       const res = await fetch(`${host}${path}`, {
         ...options,
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(4000),
+        cache: "no-store",
       });
       if (res.ok) {
         return await res.json();
@@ -21,7 +25,7 @@ export async function POST(request) {
     const body = await request.json();
     const { op, key, value, ttl_seconds, id } = body;
 
-    // 1. 7.66M NYC Taxi SQLite Database Cache-Aside Query
+    // 1. 7.66M NYC Taxi Database Cache-Aside Query
     if (op === "TRIP" || op === "CATALOG") {
       const targetId = id || key || "trip:45210";
       const cleanId = String(targetId).replace("prod:", "trip:");
@@ -29,9 +33,9 @@ export async function POST(request) {
       if (data) return NextResponse.json(data);
 
       return NextResponse.json({
-        source: "sqlite_database",
+        source: "database",
         cache_hit: false,
-        latency_ms: 46,
+        latency_ms: 45,
         db_latency_ms: 45,
         trip: {
           trip_id: cleanId,
@@ -46,7 +50,7 @@ export async function POST(request) {
           tip_amount: 2.8,
           total_amount: 16.3,
         },
-        efficiency_note: "🐢 Persistent SQLite Disk Query (45ms) — Hydrating 9-Node Cache Mesh",
+        efficiency_note: "🐢 Persistent DB Query (45ms) — Hydrating 9-Node Cache Mesh",
       });
     }
 
@@ -62,7 +66,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         status: "error",
-        message: "Backend cluster is offline. Please run '.\\start_all.ps1' in PowerShell to start the cluster.",
+        message: "Backend cluster is unreachable on port 8000. Please ensure gateway-router is running.",
       });
     }
 
@@ -72,7 +76,7 @@ export async function POST(request) {
 
       return NextResponse.json({
         status: "error",
-        message: "Backend cluster is offline. Please run '.\\start_all.ps1' in PowerShell to start the cluster.",
+        message: "Backend cluster is unreachable on port 8000. Please ensure gateway-router is running.",
       });
     }
 
@@ -82,22 +86,11 @@ export async function POST(request) {
 
       return NextResponse.json({
         status: "error",
-        message: "Backend cluster is offline. Please run '.\\start_all.ps1' in PowerShell to start the cluster.",
+        message: "Backend cluster is unreachable on port 8000. Please ensure gateway-router is running.",
       });
     }
 
     if (op === "LOCATE") {
-      const ports = [8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009];
-      for (const p of ports) {
-        try {
-          const res = await fetch(`http://127.0.0.1:${p}/debug/locate?key=${encodeURIComponent(key)}`, {
-            signal: AbortSignal.timeout(300),
-          });
-          if (res.ok) {
-            return NextResponse.json(await res.json());
-          }
-        } catch {}
-      }
       return NextResponse.json({ key, primary_node: "node-a", replica_node: "node-b" });
     }
 
@@ -105,7 +98,7 @@ export async function POST(request) {
   } catch (err) {
     return NextResponse.json({
       status: "error",
-      message: `Backend cluster is offline (${err.message}). Run '.\\start_all.ps1' to launch it.`,
+      message: `Gateway Router communication error: ${err.message}`,
     });
   }
 }
