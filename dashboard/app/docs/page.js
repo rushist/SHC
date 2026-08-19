@@ -259,9 +259,9 @@ export default function DocsPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div className="status-pill status-pill-alive">
+          {/* <div className="status-pill status-pill-alive">
             Gateway :8000 Active
-          </div>
+          </div> */}
           <Link href="/" className="sys-btn sys-btn-sm sys-btn-primary">
             ← Return to Cluster Console
           </Link>
