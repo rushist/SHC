@@ -86,12 +86,17 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-A: 10.0.1.10] Pulling Latest Git Commit & Rebuilding"
             echo "========================================================"
-            cd /app/shc
+            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
             git pull origin main
             docker build -t shc/backend:latest ./backend
             docker build -t shc/dashboard:latest ./dashboard
-            docker compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
-            docker compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
+            if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
+              docker compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
+            else
+              docker-compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
+              docker-compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
+            fi
             echo "✅ [EC2-A] Gateway Router (:8000), Dashboard (:3000), and Nodes A, D, G are LIVE!"
 
       - name: 🔄 2.2 Deploy to EC2-B (10.0.1.11) via Bastion
@@ -110,10 +115,14 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
             echo "========================================================"
-            cd /app/shc
+            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
             git pull origin main
             docker build -t shc/backend:latest ./backend
-            docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
+            if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
+            else
+              docker-compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
+            fi
             echo "✅ [EC2-B] Nodes B, E, H are LIVE!"
 
       - name: 🔄 2.3 Deploy to EC2-C (10.0.1.13) via Bastion
@@ -132,10 +141,14 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Cross-Host Nodes C, F, I"
             echo "========================================================"
-            cd /app/shc
+            if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
             git pull origin main
             docker build -t shc/backend:latest ./backend
-            docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
+            if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
+            else
+              docker-compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
+            fi
             echo "✅ [EC2-C] Nodes C, F, I are LIVE!"
 
       - name: 🌐 2.3 Publish Deployment Summary

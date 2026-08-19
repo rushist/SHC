@@ -285,7 +285,7 @@ func (g *Gateway) handleAPISet(w http.ResponseWriter, r *http.Request) {
 					"db_updated":  dbUpdated,
 					"served_by":   replica.NodeID,
 					"is_failover": true,
-					"message":     "✓ Written through to SQLite Database & synchronized to Replica Node",
+					"message":     "✓ Written through to Database & synchronized to Replica Node",
 				})
 				return
 			}
@@ -298,6 +298,18 @@ func (g *Gateway) handleAPISet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+
+	// 4. Always replicate synchronously/asynchronously to Replica node (Cross-Host Fault Tolerance)
+	if len(targets) > 1 {
+		replica := targets[1]
+		if replica.Addr != "" && replica.Addr != destAddr {
+			go func(addr string, body []byte) {
+				if rResp, rErr := g.client.Post(fmt.Sprintf("%s/set", addr), "application/json", bytes.NewReader(body)); rErr == nil {
+					_ = rResp.Body.Close()
+				}
+			}(replica.Addr, payloadBytes)
+		}
+	}
 
 	g.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":      "stored",

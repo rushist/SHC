@@ -15,7 +15,7 @@ services:
       - HOST_ID=EC2-C
       - NODE_ADDRESS=0.0.0.0
       - NODE_PORT=8001
-      - PEER_NODES=${PEER_NODES}
+      - PEER_NODES=${PEER_NODES:-node-a=http://10.0.1.10:8001,node-b=http://10.0.1.11:8001,node-c=http://10.0.1.13:8001,node-d=http://10.0.1.10:8002,node-e=http://10.0.1.11:8002,node-f=http://10.0.1.13:8002,node-g=http://10.0.1.10:8003,node-h=http://10.0.1.11:8003,node-i=http://10.0.1.13:8003}
       - CLEANUP_INTERVAL=1s
       - HEARTBEAT_INTERVAL=500ms
       - SUSPECT_TIMEOUT=1s
@@ -35,7 +35,7 @@ services:
       - HOST_ID=EC2-C
       - NODE_ADDRESS=0.0.0.0
       - NODE_PORT=8002
-      - PEER_NODES=${PEER_NODES}
+      - PEER_NODES=${PEER_NODES:-node-a=http://10.0.1.10:8001,node-b=http://10.0.1.11:8001,node-c=http://10.0.1.13:8001,node-d=http://10.0.1.10:8002,node-e=http://10.0.1.11:8002,node-f=http://10.0.1.13:8002,node-g=http://10.0.1.10:8003,node-h=http://10.0.1.11:8003,node-i=http://10.0.1.13:8003}
       - CLEANUP_INTERVAL=1s
       - HEARTBEAT_INTERVAL=500ms
       - SUSPECT_TIMEOUT=1s
@@ -55,7 +55,7 @@ services:
       - HOST_ID=EC2-C
       - NODE_ADDRESS=0.0.0.0
       - NODE_PORT=8003
-      - PEER_NODES=${PEER_NODES}
+      - PEER_NODES=${PEER_NODES:-node-a=http://10.0.1.10:8001,node-b=http://10.0.1.11:8001,node-c=http://10.0.1.13:8001,node-d=http://10.0.1.10:8002,node-e=http://10.0.1.11:8002,node-f=http://10.0.1.13:8002,node-g=http://10.0.1.10:8003,node-h=http://10.0.1.11:8003,node-i=http://10.0.1.13:8003}
       - CLEANUP_INTERVAL=1s
       - HEARTBEAT_INTERVAL=500ms
       - SUSPECT_TIMEOUT=1s
