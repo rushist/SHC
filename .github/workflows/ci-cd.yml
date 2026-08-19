@@ -94,12 +94,15 @@ jobs:
             docker compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
             echo "✅ [EC2-A] Gateway Router (:8000), Dashboard (:3000), and Nodes A, D, G are LIVE!"
 
-      - name: 🔄 2.2 Deploy to EC2-B (Nodes B, E, H) & EC2-C (Nodes C, F, I)
+      - name: 🔄 2.2 Deploy to EC2-B (10.0.1.11) via Bastion
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_A_HOST }}
+          host: 10.0.1.11
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_host: ${{ secrets.EC2_A_HOST }}
+          proxy_username: ${{ secrets.EC2_USER }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           timeout: 60s
           command_timeout: 10m
@@ -107,13 +110,32 @@ jobs:
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
             echo "========================================================"
-            ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@10.0.1.11 "cd /app/shc && git pull origin main && docker build -t shc/backend:latest ./backend && docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate"
+            cd /app/shc
+            git pull origin main
+            docker build -t shc/backend:latest ./backend
+            docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
             echo "✅ [EC2-B] Nodes B, E, H are LIVE!"
 
+      - name: 🔄 2.3 Deploy to EC2-C (10.0.1.13) via Bastion
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 10.0.1.13
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_host: ${{ secrets.EC2_A_HOST }}
+          proxy_username: ${{ secrets.EC2_USER }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          command_timeout: 10m
+          script: |
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Cross-Host Nodes C, F, I"
             echo "========================================================"
-            ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@10.0.1.13 "cd /app/shc && git pull origin main && docker build -t shc/backend:latest ./backend && docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate"
+            cd /app/shc
+            git pull origin main
+            docker build -t shc/backend:latest ./backend
+            docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
             echo "✅ [EC2-C] Nodes C, F, I are LIVE!"
 
       - name: 🌐 2.3 Publish Deployment Summary
