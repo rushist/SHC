@@ -6,7 +6,7 @@ export async function GET() {
   let hotKeys = [];
 
   const routerUrl = process.env.ROUTER_URL || "http://127.0.0.1:8000";
-  const hosts = [routerUrl, "http://gateway-router:8000", "http://127.0.0.1:8000", "http://localhost:8000"];
+  const hosts = [routerUrl, "http://shc-gateway-router:8000", "http://gateway-router:8000", "http://10.0.1.10:8000", "http://127.0.0.1:8000", "http://localhost:8000"];
 
   // 1. Fetch gateway cluster overview safely
   for (const host of hosts) {

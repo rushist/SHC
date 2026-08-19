@@ -507,18 +507,20 @@ func (g *Gateway) handleAPITrip(w http.ResponseWriter, r *http.Request) {
 	totalLatency := time.Since(start).Milliseconds()
 	tripJSON, _ := json.Marshal(trip)
 
-	// 3. Asynchronously Populate / Hydrate the Distributed Cache Mesh
-	go func() {
-		targets, err := g.hashRing.GetNodes(cacheKey, 2)
-		if err == nil && len(targets) > 0 {
-			reqBody, _ := json.Marshal(ClientSetRequest{
-				Key:        cacheKey,
-				Value:      string(tripJSON),
-				TTLSeconds: 300, // Cache for 5 minutes
-			})
-			_ = g.forwardSet(targets[0].Addr, reqBody)
+	// 3. Populate / Hydrate both Primary and Replica in the 9-Node Cache Ring
+	targets, ringErr := g.hashRing.GetNodes(cacheKey, 2)
+	if ringErr == nil && len(targets) > 0 {
+		reqBody, _ := json.Marshal(ClientSetRequest{
+			Key:        cacheKey,
+			Value:      string(tripJSON),
+			TTLSeconds: 600, // Cache for 10 minutes
+		})
+		for _, target := range targets {
+			if target.Addr != "" {
+				_ = g.forwardSet(target.Addr, reqBody)
+			}
 		}
-	}()
+	}
 
 	g.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"source":          "backing_database",
