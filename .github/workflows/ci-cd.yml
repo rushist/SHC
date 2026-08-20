@@ -7,12 +7,16 @@ on:
     branches: [ main ]
   workflow_dispatch: # Allows 1-click manual trigger from GitHub UI
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   # =========================================================================
-  # STAGE 1: Continuous Integration (Automated Test, Compile & Validation)
+  # STAGE 1: Continuous Integration (High-Speed Cloud Build & GHCR Publish)
   # =========================================================================
   ci:
-    name: "🔍 Phase 1: Build & Validate"
+    name: "🔍 Phase 1: Build & Publish Images"
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +29,7 @@ jobs:
           go-version: '1.22'
           cache-dependency-path: backend/go.sum
 
-      - name: 🔨 1.3 Compile Go Backend (Router & Cache Nodes)
+      - name: 🔨 1.3 Compile Go Backend (Validation)
         run: |
           echo "========================================================"
           echo "🚀 Compiling SHC Go Binaries (Router & Distributed Nodes)"
@@ -43,7 +47,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: 💻 1.5 Build Next.js 16 Production Dashboard
+      - name: 💻 1.5 Build Next.js 16 Production Dashboard (Validation)
         run: |
           echo "========================================================"
           echo "🚀 Building Next.js Dashboard & Documentation Portal"
@@ -53,18 +57,38 @@ jobs:
           npm run build
           echo "✅ Next.js production build completed successfully"
 
-      - name: 📊 1.6 Generate CI Build Summary
+      - name: 🐳 1.6 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 1.7 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚀 1.8 Build & Push Ultra-Fast Docker Images to GHCR
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "Building & pushing to ghcr.io/${REPO_LOWER}..."
+          docker build -t "ghcr.io/${REPO_LOWER}/backend:latest" ./backend
+          docker build -t "ghcr.io/${REPO_LOWER}/dashboard:latest" ./dashboard
+          docker push "ghcr.io/${REPO_LOWER}/backend:latest"
+          docker push "ghcr.io/${REPO_LOWER}/dashboard:latest"
+          echo "✅ Pre-built images published to GHCR!"
+
+      - name: 📊 1.9 Generate CI Build Summary
         if: always()
         run: |
           echo "### 🔍 CI Validation Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status | Target |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Go Backend** | ✅ Compiled | Router (:8000) & CacheNode (:8001-8003) |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Next.js Dashboard** | ✅ Built | Console UI & Docs Portal (:3000) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Go Backend** | ✅ Compiled & Published | \`ghcr.io/${{ github.repository }}/backend:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Next.js Dashboard** | ✅ Built & Published | \`ghcr.io/${{ github.repository }}/dashboard:latest\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` | \`${{ github.ref_name }}\` by @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
 
   # =========================================================================
-  # STAGE 2: Continuous Deployment (Zero-Downtime AWS Multi-EC2 Rollout)
+  # STAGE 2: Continuous Deployment (Zero-Downtime Instant Pull & Rollout)
   # =========================================================================
   deploy:
     name: "🚀 Phase 2: Deploy to AWS Cluster"
@@ -81,20 +105,23 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           timeout: 120s
-          command_timeout: 30m
+          command_timeout: 15m
           script: |
             echo "========================================================"
-            echo "⚡ [EC2-A: 10.0.1.10] Pulling Latest Git Commit & Rebuilding"
+            echo "⚡ [EC2-A: 10.0.1.10] Instant Pull & Restart Containers"
             echo "========================================================"
-            export DOCKER_BUILDKIT=1
             if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
             git pull origin main
-            docker build -t shc/backend:latest ./backend
-            docker build -t shc/dashboard:latest ./dashboard
+            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            export DOCKER_REGISTRY="ghcr.io/${REPO_LOWER}"
             if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-a.docker-compose.yml pull || true
+              docker compose -f deploy/gateway.docker-compose.yml pull || true
               docker compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
               docker compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
             else
+              docker-compose -f deploy/ec2-a.docker-compose.yml pull || true
+              docker-compose -f deploy/gateway.docker-compose.yml pull || true
               docker-compose -f deploy/ec2-a.docker-compose.yml up -d --force-recreate
               docker-compose -f deploy/gateway.docker-compose.yml up -d --force-recreate
             fi
@@ -111,21 +138,23 @@ jobs:
           proxy_key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           timeout: 120s
-          command_timeout: 30m
+          command_timeout: 15m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
             echo "========================================================"
-            export DOCKER_BUILDKIT=1
             if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
               mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
             fi
             if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; fi
             git pull origin main || true
-            docker build -t shc/backend:latest ./backend
+            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            export DOCKER_REGISTRY="ghcr.io/${REPO_LOWER}"
             if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-b.docker-compose.yml pull || true
               docker compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
             else
+              docker-compose -f deploy/ec2-b.docker-compose.yml pull || true
               docker-compose -f deploy/ec2-b.docker-compose.yml up -d --force-recreate
             fi
             echo "✅ [EC2-B] Nodes B, E, H are LIVE!"
@@ -141,21 +170,23 @@ jobs:
           proxy_key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           timeout: 120s
-          command_timeout: 30m
+          command_timeout: 15m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Cross-Host Nodes C, F, I"
             echo "========================================================"
-            export DOCKER_BUILDKIT=1
             if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
               mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
             fi
             if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; fi
             git pull origin main || true
-            docker build -t shc/backend:latest ./backend
+            REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            export DOCKER_REGISTRY="ghcr.io/${REPO_LOWER}"
             if docker compose version >/dev/null 2>&1; then
+              docker compose -f deploy/ec2-c.docker-compose.yml pull || true
               docker compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
             else
+              docker-compose -f deploy/ec2-c.docker-compose.yml pull || true
               docker-compose -f deploy/ec2-c.docker-compose.yml up -d --force-recreate
             fi
             echo "✅ [EC2-C] Nodes C, F, I are LIVE!"
