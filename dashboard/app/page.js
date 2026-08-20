@@ -101,33 +101,23 @@ export default function Dashboard() {
   const addLog = useCallback((message, type = "info") => {
     const time = new Date().toLocaleTimeString();
     const entry = {
-      id: Math.random(),
-      seq: Date.now() * 100000 + Math.floor(Math.random() * 1000),
+      id: Math.random().toString(36).slice(2) + "-" + Date.now(),
       time,
       message,
       type,
     };
-    setLogs((prev) => {
-      const merged = [entry, ...prev];
-      merged.sort((a, b) => b.seq - a.seq);
-      return merged.slice(0, 500);
-    });
+    setLogs((prev) => [entry, ...prev].slice(0, 500));
   }, []);
 
   const addLogBatch = useCallback((newEntries) => {
     const time = new Date().toLocaleTimeString();
     const formatted = newEntries.map((e) => ({
-      id: Math.random(),
-      seq: e.seq !== undefined ? e.seq : (Date.now() * 100000 + Math.floor(Math.random() * 1000)),
+      id: Math.random().toString(36).slice(2) + "-" + Date.now(),
       time,
       message: e.message,
       type: e.type || "info",
     }));
-    setLogs((prev) => {
-      const merged = [...formatted, ...prev];
-      merged.sort((a, b) => b.seq - a.seq);
-      return merged.slice(0, 500);
-    });
+    setLogs((prev) => [...formatted, ...prev].slice(0, 500));
   }, []);
 
   const refreshCluster = useCallback(async () => {
@@ -315,7 +305,6 @@ export default function Dashboard() {
               : `DATABASE READ (Hydrated to Cache) [${itemLatency.toFixed(1)}ms]`;
 
             batchLogs.push({
-              seq: startTime * 10000 + (startIdx + i + 1),
               message: `[Bombard #${startIdx + i + 1}] ${item.id} -> ${hitTag}`,
               type: item.cache_hit ? "success" : "info",
             });
