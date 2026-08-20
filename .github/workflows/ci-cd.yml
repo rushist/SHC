@@ -80,12 +80,13 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          timeout: 60s
-          command_timeout: 10m
+          timeout: 120s
+          command_timeout: 30m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-A: 10.0.1.10] Pulling Latest Git Commit & Rebuilding"
             echo "========================================================"
+            export DOCKER_BUILDKIT=1
             if [ -d /app/shc ]; then cd /app/shc; elif [ -d "$HOME/shc" ]; then cd "$HOME/shc"; elif [ -d /home/ubuntu/shc ]; then cd /home/ubuntu/shc; elif [ -d /home/ec2-user/shc ]; then cd /home/ec2-user/shc; fi
             git pull origin main
             docker build -t shc/backend:latest ./backend
@@ -109,12 +110,13 @@ jobs:
           proxy_username: ${{ secrets.EC2_USER }}
           proxy_key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          timeout: 60s
-          command_timeout: 10m
+          timeout: 120s
+          command_timeout: 30m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Cross-Host Nodes B, E, H"
             echo "========================================================"
+            export DOCKER_BUILDKIT=1
             if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
               mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
             fi
@@ -138,12 +140,13 @@ jobs:
           proxy_username: ${{ secrets.EC2_USER }}
           proxy_key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          timeout: 60s
-          command_timeout: 10m
+          timeout: 120s
+          command_timeout: 30m
           script: |
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Cross-Host Nodes C, F, I"
             echo "========================================================"
+            export DOCKER_BUILDKIT=1
             if [ ! -d "/app/shc/.git" ] && [ ! -d "$HOME/shc/.git" ] && [ ! -d "/home/ubuntu/shc/.git" ]; then
               mkdir -p "$HOME/shc" && git clone https://github.com/rushist/SHC.git "$HOME/shc" || true
             fi
