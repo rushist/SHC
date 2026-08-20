@@ -270,6 +270,9 @@ func (m *Monitor) pingPeer(peer *MemberInfo) {
 	start := time.Now()
 	resp, err := m.client.Do(req)
 	latency := time.Since(start).Milliseconds()
+	if latency <= 0 {
+		latency = 1
+	}
 
 	if err != nil {
 		m.recordFailure(peer.NodeID, err.Error())

@@ -31,14 +31,34 @@ export async function GET() {
         primary_keys: member.primary_keys || 0,
         replica_keys: member.replica_keys || 0,
         hit_count: member.hit_count || 0,
+        latency_ms: member.latency_ms !== undefined ? member.latency_ms : (member.state === "FAILED" ? null : 1),
+        last_seen: member.last_seen || null,
       };
     }
+  }
+
+  // 3. Fetch persistent database metrics
+  let dbStats = null;
+  for (const host of hosts) {
+    if (!host) continue;
+    try {
+      const dbRes = await fetch(`${host}/api/db/stats`, {
+        signal: AbortSignal.timeout(800),
+        cache: "no-store",
+      });
+      if (dbRes.ok) {
+        const data = await dbRes.json();
+        dbStats = data.database_metrics || null;
+        break;
+      }
+    } catch {}
   }
 
   return NextResponse.json({
     status: "ok",
     cluster: clusterData,
     nodeStats,
+    dbStats,
     hotKeys,
   });
 }

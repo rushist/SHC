@@ -90,3 +90,58 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .hash-ring-key { color: var(--text-muted); font-family: var(--font-mono); font-size: .65rem; text-align: center; word-break: break-all; }
 .hash-ring-key b { color: var(--text-primary); font-weight: 600; }
 @media (max-width: 480px) { .status-pill { white-space: normal; } }
+
+/* Heartbeat Monitor Styles */
+.heartbeat-icon-active {
+  transform-origin: center;
+  opacity: 0.9;
+}
+
+.heartbeat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.heartbeat-badge-alive {
+  background: rgba(29, 129, 2, 0.08);
+  border: 1px solid rgba(29, 129, 2, 0.3);
+  color: var(--status-alive-text);
+}
+
+.heartbeat-badge-failed {
+  background: rgba(209, 50, 18, 0.08);
+  border: 1px solid rgba(209, 50, 18, 0.3);
+  color: var(--status-failed-text);
+}
+
+/* Bombardment Progress & Metric Styles */
+.bombard-progress-container {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+}
+
+.bombard-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+
+.bombard-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ec7211 0%, #ff9900 50%, #0972d3 100%);
+  border-radius: 4px;
+  transition: width 0.15s ease-out;
+}
+
