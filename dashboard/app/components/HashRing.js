@@ -26,7 +26,7 @@ function arcPath(center, radius, start, end) {
   return `M ${from.x} ${from.y} A ${radius} ${radius} 0 ${largeArc} 1 ${to.x} ${to.y}`;
 }
 
-function computeKeyRingLocation(key) {
+function computeKeyRingLocation(key, nodes = {}) {
   if (!key) return null;
 
   const tokens = [];
@@ -47,6 +47,7 @@ function computeKeyRingLocation(key) {
   }
   const primaryNode = tokens[primaryIndex].nodeId;
 
+  // Find replica node (next distinct node clockwise)
   let replicaNode = "node-b";
   for (let i = 1; i < tokens.length; i++) {
     const idx = (primaryIndex + i) % tokens.length;
@@ -56,11 +57,35 @@ function computeKeyRingLocation(key) {
     }
   }
 
+  // Consistent Hashing Failover Routing: If primary node is FAILED, route clockwise to next healthy node
+  const isPrimaryFailed = nodes[primaryNode]?.state === "FAILED";
+  let effectiveNode = primaryNode;
+  let isFailover = false;
+
+  if (isPrimaryFailed) {
+    for (let i = 1; i < tokens.length; i++) {
+      const idx = (primaryIndex + i) % tokens.length;
+      const candidateId = tokens[idx].nodeId;
+      if (candidateId !== primaryNode && nodes[candidateId]?.state !== "FAILED") {
+        effectiveNode = candidateId;
+        isFailover = true;
+        break;
+      }
+    }
+    if (!isFailover) {
+      effectiveNode = replicaNode;
+      isFailover = true;
+    }
+  }
+
   return {
     key,
     hash: keyHash,
     primary_node: primaryNode,
     replica_node: replicaNode,
+    effective_node: effectiveNode,
+    is_failover: isFailover,
+    primary_failed: isPrimaryFailed,
   };
 }
 
@@ -84,22 +109,27 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
       const randHash = Math.floor(Math.random() * maxHash);
       const angle = (randHash / maxHash) * 360;
       const nodeIndex = Math.floor((angle / 360) * ALL_NODE_IDS.length);
-      const activeBombardNode = ALL_NODE_IDS[nodeIndex % ALL_NODE_IDS.length];
-      const replicaIndex = (nodeIndex + 1) % ALL_NODE_IDS.length;
-      const replicaBombardNode = ALL_NODE_IDS[replicaIndex];
+      const primaryCandidate = ALL_NODE_IDS[nodeIndex % ALL_NODE_IDS.length];
+      const replicaCandidate = ALL_NODE_IDS[(nodeIndex + 1) % ALL_NODE_IDS.length];
+
+      const isCandidateFailed = nodes[primaryCandidate]?.state === "FAILED";
+      const effectiveCandidate = isCandidateFailed ? replicaCandidate : primaryCandidate;
 
       setBombardState({
         hash: randHash,
         angle,
-        primary_node: activeBombardNode,
-        replica_node: replicaBombardNode,
+        primary_node: primaryCandidate,
+        replica_node: replicaCandidate,
+        effective_node: effectiveCandidate,
+        is_failover: isCandidateFailed,
+        primary_failed: isCandidateFailed,
         point: polarPoint(center, radius, angle),
         simulatedKey: `trip:${Math.floor(Math.random() * 7660000) + 1}`,
       });
     }, 75);
 
     return () => clearInterval(timer);
-  }, [isBombarding, center, radius, maxHash]);
+  }, [isBombarding, nodes, center, radius, maxHash]);
 
   const vnodes = useMemo(() => {
     const nodeKeys = Object.keys(nodes).length > 0 ? Object.keys(nodes) : ALL_NODE_IDS;
@@ -126,10 +156,18 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
     if (isBombarding && bombardState) {
       return bombardState;
     }
-    if (keyLocation?.primary_node) return keyLocation;
-    if (activeKey) return computeKeyRingLocation(activeKey);
+    if (keyLocation?.primary_node) {
+      const isPrimaryFailed = nodes[keyLocation.primary_node]?.state === "FAILED";
+      return {
+        ...keyLocation,
+        effective_node: isPrimaryFailed ? (keyLocation.replica_node || "node-b") : keyLocation.primary_node,
+        is_failover: isPrimaryFailed,
+        primary_failed: isPrimaryFailed,
+      };
+    }
+    if (activeKey) return computeKeyRingLocation(activeKey, nodes);
     return null;
-  }, [isBombarding, bombardState, keyLocation, activeKey]);
+  }, [isBombarding, bombardState, keyLocation, activeKey, nodes]);
 
   const keyPos = useMemo(() => {
     if (isBombarding && bombardState) {
@@ -141,11 +179,26 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
     return { hash, angle, point: polarPoint(center, radius, angle), key: activeKey };
   }, [isBombarding, bombardState, activeKey, center, radius, maxHash]);
 
-  const activeNode = locationInfo?.primary_node || "node-a";
-  const activeReplica = locationInfo?.replica_node || "node-b";
-  const nodeIdx = ALL_NODE_IDS.indexOf(activeNode);
-  const activeColor = nodeIdx >= 0 ? NODE_COLORS[nodeIdx % NODE_COLORS.length] : "#007eb9";
+  const primaryNode = locationInfo?.primary_node || "node-a";
+  const replicaNode = locationInfo?.replica_node || "node-b";
+  const effectiveNode = locationInfo?.effective_node || (nodes[primaryNode]?.state === "FAILED" ? replicaNode : primaryNode);
+  const isFailover = locationInfo?.is_failover || nodes[primaryNode]?.state === "FAILED";
+
+  const effectiveNodeIdx = ALL_NODE_IDS.indexOf(effectiveNode);
+  const activeColor = effectiveNodeIdx >= 0 ? NODE_COLORS[effectiveNodeIdx % NODE_COLORS.length] : "#007eb9";
   const displayKey = isBombarding && bombardState ? bombardState.simulatedKey : (activeKey || "trip:45210");
+
+  // If failover is active, compute the replica target coordinate on the ring
+  const effectiveAngle = useMemo(() => {
+    if (!isFailover) return keyPos?.angle;
+    const effIdx = ALL_NODE_IDS.indexOf(effectiveNode);
+    return effIdx >= 0 ? (effIdx * 40 + 17) : (keyPos?.angle || 0);
+  }, [isFailover, effectiveNode, keyPos]);
+
+  const effectivePoint = useMemo(() => {
+    if (effectiveAngle === undefined || effectiveAngle === null) return keyPos?.point;
+    return polarPoint(center, radius, effectiveAngle);
+  }, [effectiveAngle, keyPos, center, radius]);
 
   return (
     <div className="hash-ring-wrap">
@@ -170,16 +223,21 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
 
           {/* Node Arc Boundaries */}
           {Array.from({ length: 9 }, (_, i) => {
-            const isThisSectorActive = ALL_NODE_IDS[i] === activeNode;
+            const nodeId = ALL_NODE_IDS[i];
+            const isNodeFailed = nodes[nodeId]?.state === "FAILED";
+            const isThisSectorActive = nodeId === effectiveNode;
+            const isPrimarySector = nodeId === primaryNode;
+
             return (
               <path
                 key={i}
                 d={arcPath(center, radius + 8, i * 40, i * 40 + 35)}
                 fill="none"
-                stroke={NODE_COLORS[i]}
-                strokeWidth={isThisSectorActive ? "7" : "5"}
+                stroke={isNodeFailed ? "var(--text-dim)" : NODE_COLORS[i]}
+                strokeWidth={isThisSectorActive ? "7" : isPrimarySector && isNodeFailed ? "3" : "5"}
                 strokeLinecap="round"
-                opacity={Object.values(nodes)[i]?.state === "FAILED" ? 0.25 : (isThisSectorActive ? 1 : 0.65)}
+                strokeDasharray={isNodeFailed ? "4 3" : "none"}
+                opacity={isNodeFailed ? 0.35 : (isThisSectorActive ? 1 : 0.65)}
                 style={{ transition: "stroke-width 0.12s ease-out, opacity 0.12s ease-out" }}
               />
             );
@@ -187,7 +245,9 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
 
           {/* Virtual Node Tokens */}
           {vnodes.map((v) => {
-            const isTargetNode = v.nodeId === activeNode;
+            const isTargetNode = v.nodeId === effectiveNode;
+            const isPrimaryFailedNode = v.nodeId === primaryNode && v.isFailed;
+
             return (
               <circle
                 key={v.id}
@@ -195,55 +255,90 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
                 cy={v.point.y}
                 r={v.isFailed ? 3 : isTargetNode ? 5.5 : 4.2}
                 fill={v.isFailed ? "var(--text-dim)" : v.color}
-                opacity={v.isFailed ? 0.35 : isTargetNode ? 1 : 0.85}
-                stroke={isTargetNode ? "#ffffff" : "var(--bg-surface)"}
-                strokeWidth={isTargetNode ? "2" : "1.5"}
+                opacity={v.isFailed ? (isPrimaryFailedNode ? 0.45 : 0.25) : isTargetNode ? 1 : 0.85}
+                stroke={isTargetNode ? "#ffffff" : v.isFailed ? "var(--status-failed-border)" : "var(--bg-surface)"}
+                strokeWidth={isTargetNode ? "2" : "1"}
                 style={{ transition: "r 0.08s ease-out, opacity 0.08s ease-out" }}
               />
             );
           })}
 
           {/* Active Key Target Tracer & Rotating Coordinate Ray */}
-          {keyPos && (
+          {effectivePoint && (
             <g>
-              {/* Pulsing Outer Glow */}
+              {/* Failover Origin Ghost Marker (Shows where the key hashed originally if primary is offline) */}
+              {isFailover && keyPos && (
+                <g opacity="0.6">
+                  <line
+                    x1={center}
+                    y1={center}
+                    x2={keyPos.point.x}
+                    y2={keyPos.point.y}
+                    stroke="#d13212"
+                    strokeWidth="1.2"
+                    strokeDasharray="2 3"
+                  />
+                  <circle cx={keyPos.point.x} cy={keyPos.point.y} r="4" fill="none" stroke="#d13212" strokeWidth="1.5" />
+                  <line
+                    x1={keyPos.point.x - 3}
+                    y1={keyPos.point.y - 3}
+                    x2={keyPos.point.x + 3}
+                    y2={keyPos.point.y + 3}
+                    stroke="#d13212"
+                    strokeWidth="1.2"
+                  />
+                  <line
+                    x1={keyPos.point.x + 3}
+                    y1={keyPos.point.y - 3}
+                    x2={keyPos.point.x - 3}
+                    y2={keyPos.point.y + 3}
+                    stroke="#d13212"
+                    strokeWidth="1.2"
+                  />
+                </g>
+              )}
+
+              {/* Pulsing Outer Glow on Active Target (Replica or Primary) */}
               <circle
-                cx={keyPos.point.x}
-                cy={keyPos.point.y}
-                r={isBombarding ? "13" : "9"}
+                cx={effectivePoint.x}
+                cy={effectivePoint.y}
+                r={isBombarding ? "13" : isFailover ? "11" : "9"}
                 fill={activeColor}
-                opacity={isBombarding ? "0.45" : "0.28"}
-                style={{ transition: "cx 0.06s linear, cy 0.06s linear" }}
+                opacity={isBombarding ? "0.45" : isFailover ? "0.38" : "0.28"}
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out" }}
               />
-              {/* Center-to-Token Direction Ray */}
+
+              {/* Center-to-Target Routing Ray */}
               <line
                 x1={center}
                 y1={center}
-                x2={keyPos.point.x}
-                y2={keyPos.point.y}
+                x2={effectivePoint.x}
+                y2={effectivePoint.y}
                 stroke={activeColor}
-                strokeWidth={isBombarding ? "2.4" : "1.8"}
-                strokeDasharray="4 3"
+                strokeWidth={isBombarding ? "2.4" : isFailover ? "2.2" : "1.8"}
+                strokeDasharray={isFailover ? "5 3" : "4 3"}
                 opacity="0.9"
-                style={{ transition: "x2 0.06s linear, y2 0.06s linear, stroke 0.1s ease" }}
+                style={{ transition: "x2 0.08s ease-out, y2 0.08s ease-out, stroke 0.1s ease" }}
               />
+
               {/* Outer Cursor Halo */}
               <circle
-                cx={keyPos.point.x}
-                cy={keyPos.point.y}
-                r={isBombarding ? "8" : "7.5"}
+                cx={effectivePoint.x}
+                cy={effectivePoint.y}
+                r={isBombarding ? "8" : isFailover ? "8" : "7.5"}
                 fill="var(--bg-surface)"
                 stroke={activeColor}
-                strokeWidth="2.5"
-                style={{ transition: "cx 0.06s linear, cy 0.06s linear" }}
+                strokeWidth={isFailover ? "2.8" : "2.5"}
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out" }}
               />
+
               {/* Inner Core Pulse */}
               <circle
-                cx={keyPos.point.x}
-                cy={keyPos.point.y}
+                cx={effectivePoint.x}
+                cy={effectivePoint.y}
                 r={isBombarding ? "4" : "3.5"}
                 fill={activeColor}
-                style={{ transition: "cx 0.06s linear, cy 0.06s linear, fill 0.1s ease" }}
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out, fill 0.1s ease" }}
               />
             </g>
           )}
@@ -251,32 +346,69 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
 
         {/* Center Ring Telemetry */}
         <div className="hash-ring-center">
-          <div className="hash-ring-kicker">{isBombarding ? "⚡ BOMBARDING" : "Consistent Hash"}</div>
+          <div className="hash-ring-kicker">
+            {isBombarding ? "⚡ BOMBARDING" : isFailover ? "⚡ FAILOVER SHIFT" : "Consistent Hash"}
+          </div>
           <strong style={{ fontSize: "1.1rem" }}>450</strong>
           <span style={{ fontSize: "0.68rem" }}>virtual tokens</span>
-          <div style={{ marginTop: "4px", fontSize: "0.80rem", fontWeight: 700, color: activeColor, fontFamily: "var(--font-mono)", transition: "color 0.1s ease" }}>
-            Primary: {activeNode}
-          </div>
-          <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Replica: {activeReplica}
-          </div>
+          
+          {/* Failover-aware Node Status */}
+          {isFailover ? (
+            <>
+              <div style={{ marginTop: "3px", fontSize: "0.72rem", color: "#d13212", fontFamily: "var(--font-mono)", fontWeight: 600, textDecoration: "line-through" }}>
+                {primaryNode} (FAILED)
+              </div>
+              <div style={{ fontSize: "0.80rem", fontWeight: 700, color: activeColor, fontFamily: "var(--font-mono)" }}>
+                &rarr; {effectiveNode} (REPLICA)
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ marginTop: "4px", fontSize: "0.80rem", fontWeight: 700, color: activeColor, fontFamily: "var(--font-mono)", transition: "color 0.1s ease" }}>
+                Primary: {primaryNode}
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                Replica: {replicaNode}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Legend with perfect center flex layout */}
       <div className="hash-ring-legend">
-        {ALL_NODE_IDS.map((nodeId, i) => (
-          <span key={nodeId} style={{ opacity: nodeId === activeNode ? 1 : 0.7, fontWeight: nodeId === activeNode ? 700 : 400 }}>
-            <i style={{ background: NODE_COLORS[i] }} />
-            {nodeId}
-          </span>
-        ))}
+        {ALL_NODE_IDS.map((nodeId, i) => {
+          const isFailed = nodes[nodeId]?.state === "FAILED";
+          const isEffective = nodeId === effectiveNode;
+
+          return (
+            <span
+              key={nodeId}
+              style={{
+                opacity: isFailed ? 0.35 : isEffective ? 1 : 0.7,
+                fontWeight: isEffective ? 700 : 400,
+                textDecoration: isFailed ? "line-through" : "none",
+              }}
+            >
+              <i style={{ background: isFailed ? "var(--text-dim)" : NODE_COLORS[i] }} />
+              {nodeId}
+            </span>
+          );
+        })}
       </div>
 
-      {/* Target Key & FNV-1a Hash Details */}
+      {/* Target Key & FNV-1a Routing Details */}
       {keyPos && (
         <div className="hash-ring-key" style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", marginTop: "4px" }}>
-          Target: <strong>{displayKey}</strong> · Hash: <strong>{keyPos.hash}</strong> → <span style={{ color: activeColor, fontWeight: 700 }}>{activeNode}</span>
+          {isFailover ? (
+            <>
+              Key: <strong>{displayKey}</strong> · <span style={{ color: "#d13212" }}>{primaryNode} FAILED</span> &rarr; <span style={{ color: activeColor, fontWeight: 700 }}>⚡ Routed to {effectiveNode} (Replica)</span>
+            </>
+          ) : (
+            <>
+              Key: <strong>{displayKey}</strong> · Hash: <strong>{keyPos.hash}</strong> &rarr; <span style={{ color: activeColor, fontWeight: 700 }}>{primaryNode} (Primary)</span>
+            </>
+          )}
         </div>
       )}
     </div>
