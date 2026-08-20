@@ -278,6 +278,9 @@ export default function Dashboard() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ op: "BATCH_BOMBARD", keys: currentBatchKeys }),
           });
+          if (!res.ok) {
+            continue;
+          }
           const data = await res.json();
           const results = data.results || [];
 

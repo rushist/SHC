@@ -81,19 +81,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: 🔑 2.0 Setup SSH Key & Configuration
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+            ConnectTimeout 15
+          EOF
+          chmod 600 ~/.ssh/config
+
       # -----------------------------------------------------------------------
       # 2.1 Deploy to EC2-A (Public Gateway + Storage Nodes A, D, G)
       # -----------------------------------------------------------------------
       - name: 📡 2.1 Deploy to EC2-A (Gateway Router + Dashboard + Nodes A, D, G)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_A_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          timeout: 60s
-          command_timeout: 5m
-          script: |
+        run: |
+          echo "Connecting to EC2-A (${{ secrets.EC2_A_HOST }})..."
+          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_A_HOST }} 'bash -s' << 'EOF'
+            set -e
             echo "========================================================"
             echo "⚡ [EC2-A: 10.0.1.10] Syncing & Rolling Out Containers"
             echo "========================================================"
@@ -137,27 +147,18 @@ jobs:
             fi
 
             $DOCKER_CMD -f deploy/ec2-a.docker-compose.yml pull || true
-            $DOCKER_CMD -f deploy/gateway.docker-compose.yml pull || true
             $DOCKER_CMD -f deploy/ec2-a.docker-compose.yml up -d --remove-orphans --force-recreate
-            $DOCKER_CMD -f deploy/gateway.docker-compose.yml up -d --remove-orphans --force-recreate
             echo "✅ [EC2-A] Gateway Router (:8000), Dashboard (:3000), and Nodes A, D, G are LIVE!"
+          EOF
 
       # -----------------------------------------------------------------------
       # 2.2 Deploy to EC2-B (Private Node: 10.0.1.11 via Bastion)
       # -----------------------------------------------------------------------
       - name: 🔄 2.2 Deploy to EC2-B (Nodes B, E, H via Bastion)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 10.0.1.11
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          proxy_host: ${{ secrets.EC2_A_HOST }}
-          proxy_username: ${{ secrets.EC2_USER }}
-          proxy_key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          timeout: 60s
-          command_timeout: 5m
-          script: |
+        run: |
+          echo "Connecting to EC2-B (10.0.1.11 via Bastion ${{ secrets.EC2_A_HOST }})..."
+          ssh -i ~/.ssh/id_rsa -J ${{ secrets.EC2_USER }}@${{ secrets.EC2_A_HOST }} ${{ secrets.EC2_USER }}@10.0.1.11 'bash -s' << 'EOF'
+            set -e
             echo "========================================================"
             echo "⚡ [EC2-B: 10.0.1.11] Updating Storage Nodes B, E, H"
             echo "========================================================"
@@ -203,23 +204,16 @@ jobs:
             $DOCKER_CMD -f deploy/ec2-b.docker-compose.yml pull || true
             $DOCKER_CMD -f deploy/ec2-b.docker-compose.yml up -d --remove-orphans --force-recreate
             echo "✅ [EC2-B] Storage Nodes B, E, H are LIVE!"
+          EOF
 
       # -----------------------------------------------------------------------
       # 2.3 Deploy to EC2-C (Private Node: 10.0.1.13 via Bastion)
       # -----------------------------------------------------------------------
       - name: 🔄 2.3 Deploy to EC2-C (Nodes C, F, I via Bastion)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 10.0.1.13
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          proxy_host: ${{ secrets.EC2_A_HOST }}
-          proxy_username: ${{ secrets.EC2_USER }}
-          proxy_key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          timeout: 60s
-          command_timeout: 5m
-          script: |
+        run: |
+          echo "Connecting to EC2-C (10.0.1.13 via Bastion ${{ secrets.EC2_A_HOST }})..."
+          ssh -i ~/.ssh/id_rsa -J ${{ secrets.EC2_USER }}@${{ secrets.EC2_A_HOST }} ${{ secrets.EC2_USER }}@10.0.1.13 'bash -s' << 'EOF'
+            set -e
             echo "========================================================"
             echo "⚡ [EC2-C: 10.0.1.13] Updating Storage Nodes C, F, I"
             echo "========================================================"
@@ -265,6 +259,7 @@ jobs:
             $DOCKER_CMD -f deploy/ec2-c.docker-compose.yml pull || true
             $DOCKER_CMD -f deploy/ec2-c.docker-compose.yml up -d --remove-orphans --force-recreate
             echo "✅ [EC2-C] Storage Nodes C, F, I are LIVE!"
+          EOF
 
       # -----------------------------------------------------------------------
       # 2.4 Publish Rollout Summary

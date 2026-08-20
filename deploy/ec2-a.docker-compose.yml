@@ -1,9 +1,45 @@
 # ==============================================================================
-# EC2-A MANIFEST (Failure Domain 1): Nodes A, D, and G
-# Target Host: EC2-A (e.g. Private IP: 10.0.1.10)
+# EC2-A MANIFEST (Public Ingress + Failure Domain 1): Gateway, Dashboard, Nodes A, D, G
+# Target Host: EC2-A (Public IP + Private IP: 10.0.1.10)
 # ==============================================================================
 
 services:
+  # Gateway Router (Port :8000)
+  gateway-router:
+    image: ${DOCKER_REGISTRY:-shc}/backend:latest
+    container_name: shc-gateway-router
+    restart: unless-stopped
+    entrypoint: ["/app/router"]
+    environment:
+      - ROUTER_PORT=8000
+      - ROUTER_HOST=0.0.0.0
+      - GATEWAY_NODES=${GATEWAY_NODES:-node-a=http://10.0.1.10:8001,node-d=http://10.0.1.10:8002,node-g=http://10.0.1.10:8003,node-b=http://10.0.1.11:8001,node-e=http://10.0.1.11:8002,node-h=http://10.0.1.11:8003,node-c=http://10.0.1.13:8001,node-f=http://10.0.1.13:8002,node-i=http://10.0.1.13:8003}
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:-shc_db}
+      - DATABASE_USER=${DATABASE_USER:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_SSLMODE=${DATABASE_SSLMODE:-require}
+      - HEARTBEAT_INTERVAL=500ms
+      - SUSPECT_TIMEOUT=1s
+      - FAIL_TIMEOUT=2s
+      - REQUEST_TIMEOUT=2s
+    network_mode: host
+
+  # Next.js Presentation Dashboard (Port :3000)
+  dashboard:
+    image: ${DOCKER_REGISTRY:-shc}/dashboard:latest
+    container_name: shc-dashboard
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - ROUTER_URL=http://127.0.0.1:8000
+      - NEXT_PUBLIC_ROUTER_URL=${NEXT_PUBLIC_ROUTER_URL:-http://127.0.0.1:8000}
+    network_mode: host
+    depends_on:
+      - gateway-router
+
   # Node A (Primary for A keys, Replicated to Node B on EC2-B)
   node-a:
     image: ${DOCKER_REGISTRY:-shc}/backend:latest
