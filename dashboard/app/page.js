@@ -67,6 +67,10 @@ export default function Dashboard() {
   const [simLoading, setSimLoading] = useState(false);
   const [activeHashLoc, setActiveHashLoc] = useState(null);
 
+  // Active HashRing State (Tracks live queries & bombardment in real-time)
+  const [activeRingKey, setActiveRingKey] = useState("trip:45210");
+  const [activeRingLoc, setActiveRingLoc] = useState(null);
+
   // 7.66M NYC Yellow Taxi Database Query State
   const [tripId, setTripId] = useState("trip:45210");
   const [tripResult, setTripResult] = useState(null);
@@ -163,6 +167,7 @@ export default function Dashboard() {
   }, [simKey]);
 
   const locateKey = async (key) => {
+    setActiveRingKey(key);
     try {
       const res = await fetch("/api/crud", {
         method: "POST",
@@ -172,6 +177,7 @@ export default function Dashboard() {
       if (res.ok) {
         const data = await res.json();
         setActiveHashLoc(data);
+        setActiveRingLoc(data);
         return data;
       }
     } catch {}
@@ -180,6 +186,8 @@ export default function Dashboard() {
 
   const handleTripQuery = async (customId = null) => {
     const targetId = customId || tripId || "trip:45210";
+    setActiveRingKey(targetId);
+    locateKey(targetId);
     setTripLoading(true);
     try {
       const res = await fetch("/api/crud", {
@@ -191,7 +199,6 @@ export default function Dashboard() {
       const internalLatency = data.latency_ms !== undefined ? data.latency_ms : (data.cache_hit ? 1 : 12);
 
       setTripResult({ ...data, roundtrip_ms: internalLatency });
-      locateKey(targetId);
 
       let hitDetails = "";
       if (data.cache_hit) {
@@ -271,6 +278,9 @@ export default function Dashboard() {
         for (let i = 0; i < batchSize && startIdx + i < count; i++) {
           currentBatchKeys.push(getQueryId());
         }
+        if (currentBatchKeys.length > 0) {
+          setActiveRingKey(currentBatchKeys[0]);
+        }
 
         try {
           const res = await fetch("/api/crud", {
@@ -283,6 +293,10 @@ export default function Dashboard() {
           }
           const data = await res.json();
           const results = data.results || [];
+
+          if (results.length > 0) {
+            setActiveRingKey(results[results.length - 1].id);
+          }
 
           const batchLogs = [];
           for (let i = 0; i < results.length; i++) {
@@ -483,10 +497,10 @@ export default function Dashboard() {
       </header>
 
       {/* Main Content Layout */}
-      <main style={{ padding: "16px 24px", display: "grid", gap: "16px" }}>
+      <main className="main-content-wrap">
         {/* Section 1: Physical Failure Domains (3 EC2 Instances) */}
         <section>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
             <div>
               <div style={{ fontSize: "0.68rem", color: "var(--accent-brand)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "2px" }}>Cluster resources</div>
               <h2 style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
@@ -498,7 +512,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "12px" }}>
+          <div className="grid-host-domains">
             {HOST_GROUPS.map((host) => {
               const hostNodes = host.nodes.map((n) => ({
                 ...n,
@@ -586,9 +600,6 @@ export default function Dashboard() {
                                 </span>
                               </div>
                             </div>
-                            <div style={{ fontSize: "0.70rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginTop: "2px" }}>
-                              Replica Target: {n.replica}
-                            </div>
                           </div>
 
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -614,7 +625,7 @@ export default function Dashboard() {
         </section>
 
         {/* Section 2: Storage Acceleration & Key Routing Inspector */}
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "12px" }}>
+        <section className="grid-storage-tier">
           {/* Card 1: 7.66M NYC Taxi Persistent Query Inspector */}
           <div className="sys-panel">
             <div className="sys-panel-header">
@@ -921,8 +932,9 @@ export default function Dashboard() {
 
             <HashRing
               nodes={nodeStats}
-              activeKey={simKey}
-              keyLocation={activeHashLoc}
+              activeKey={activeRingKey || simKey || tripId}
+              keyLocation={activeRingLoc || activeHashLoc}
+              isBombarding={bombardRunning}
             />
 
             <div style={{ fontSize: "0.70rem", color: "var(--text-muted)", textAlign: "center", marginTop: "8px" }}>

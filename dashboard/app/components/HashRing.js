@@ -64,7 +64,7 @@ function computeKeyRingLocation(key) {
   };
 }
 
-export default function HashRing({ nodes = {}, activeKey = "", keyLocation = null }) {
+export default function HashRing({ nodes = {}, activeKey = "", keyLocation = null, isBombarding = false }) {
   const size = 340;
   const center = size / 2;
   const radius = 112;
@@ -111,26 +111,26 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
 
   return (
     <div className="hash-ring-wrap">
-      <div style={{ position: "relative", width: size, height: size, maxWidth: "100%" }}>
-        <svg viewBox={`0 0 ${size} ${size}`} width="100%" height="100%" role="img" aria-label="Consistent hash ring topology">
+      <div style={{ position: "relative", width: "100%", maxWidth: "320px", margin: "0 auto", aspectRatio: "1 / 1" }}>
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          width="100%"
+          height="100%"
+          role="img"
+          aria-label="Consistent hash ring topology"
+          style={{ display: "block", margin: "0 auto", overflow: "visible" }}
+        >
+          {/* Background Concentric Guideline Rings */}
           <circle cx={center} cy={center} r={radius + 16} fill="none" stroke="var(--border-default)" strokeWidth="1" />
           <circle cx={center} cy={center} r={radius - 18} fill="var(--bg-surface-subtle)" stroke="var(--border-default)" strokeWidth="1" />
+          
+          {/* Radial Spokes */}
           {Array.from({ length: 12 }, (_, i) => {
             const point = polarPoint(center, radius + 16, i * 30);
             return <line key={i} x1={center} y1={center} x2={point.x} y2={point.y} stroke="var(--border-default)" strokeWidth="1" opacity="0.45" />;
           })}
-          {vnodes.map((v) => (
-            <circle
-              key={v.id}
-              cx={v.point.x}
-              cy={v.point.y}
-              r={v.isFailed ? 3 : 4.2}
-              fill={v.isFailed ? "var(--text-dim)" : v.color}
-              opacity={v.isFailed ? 0.35 : 0.95}
-              stroke="var(--bg-surface)"
-              strokeWidth="1.5"
-            />
-          ))}
+
+          {/* Node Arc Boundaries */}
           {Array.from({ length: 9 }, (_, i) => (
             <path
               key={i}
@@ -142,30 +142,77 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
               opacity={Object.values(nodes)[i]?.state === "FAILED" ? 0.25 : 0.72}
             />
           ))}
+
+          {/* Virtual Node Tokens */}
+          {vnodes.map((v) => {
+            const isTargetNode = v.nodeId === activeNode;
+            return (
+              <circle
+                key={v.id}
+                cx={v.point.x}
+                cy={v.point.y}
+                r={v.isFailed ? 3 : isTargetNode ? 5.5 : 4.2}
+                fill={v.isFailed ? "var(--text-dim)" : v.color}
+                opacity={v.isFailed ? 0.35 : isTargetNode ? 1 : 0.85}
+                stroke={isTargetNode ? "#ffffff" : "var(--bg-surface)"}
+                strokeWidth={isTargetNode ? "2" : "1.5"}
+                style={{ transition: "r 0.12s ease-out, opacity 0.12s ease-out" }}
+              />
+            );
+          })}
+
+          {/* Active Key Target Tracer & Ray */}
           {keyPos && (
             <g>
+              {/* Pulsing Outer Glow */}
+              <circle
+                cx={keyPos.point.x}
+                cy={keyPos.point.y}
+                r={isBombarding ? "12" : "9"}
+                fill={activeColor}
+                opacity="0.28"
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out, r 0.1s ease-out" }}
+              />
+              {/* Center-to-Token Coordinate Ray */}
               <line
                 x1={center}
                 y1={center}
                 x2={keyPos.point.x}
                 y2={keyPos.point.y}
-                stroke="var(--text-primary)"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-                opacity="0.7"
+                stroke={activeColor}
+                strokeWidth={isBombarding ? "2.2" : "1.8"}
+                strokeDasharray="4 3"
+                opacity="0.85"
+                style={{ transition: "x2 0.08s ease-out, y2 0.08s ease-out, stroke 0.15s ease" }}
               />
-              <circle cx={keyPos.point.x} cy={keyPos.point.y} r="7" fill="var(--bg-surface)" stroke="var(--text-primary)" strokeWidth="2" />
-              <circle cx={keyPos.point.x} cy={keyPos.point.y} r="3" fill="var(--text-primary)" />
+              {/* Outer Cursor Halo */}
+              <circle
+                cx={keyPos.point.x}
+                cy={keyPos.point.y}
+                r="7.5"
+                fill="var(--bg-surface)"
+                stroke={activeColor}
+                strokeWidth="2.5"
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out" }}
+              />
+              {/* Inner Core Pulse */}
+              <circle
+                cx={keyPos.point.x}
+                cy={keyPos.point.y}
+                r="3.5"
+                fill={activeColor}
+                style={{ transition: "cx 0.08s ease-out, cy 0.08s ease-out, fill 0.15s ease" }}
+              />
             </g>
           )}
         </svg>
 
         {/* Center Ring Telemetry */}
         <div className="hash-ring-center">
-          <div className="hash-ring-kicker">Consistent Hash</div>
+          <div className="hash-ring-kicker">{isBombarding ? "⚡ BOMBARDING" : "Consistent Hash"}</div>
           <strong style={{ fontSize: "1.1rem" }}>450</strong>
           <span style={{ fontSize: "0.68rem" }}>virtual tokens</span>
-          <div style={{ marginTop: "4px", fontSize: "0.80rem", fontWeight: 700, color: activeColor, fontFamily: "var(--font-mono)" }}>
+          <div style={{ marginTop: "4px", fontSize: "0.80rem", fontWeight: 700, color: activeColor, fontFamily: "var(--font-mono)", transition: "color 0.15s ease" }}>
             Primary: {activeNode}
           </div>
           <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
@@ -174,18 +221,20 @@ export default function HashRing({ nodes = {}, activeKey = "", keyLocation = nul
         </div>
       </div>
 
+      {/* Legend with perfect center flex layout */}
       <div className="hash-ring-legend">
         {ALL_NODE_IDS.map((nodeId, i) => (
-          <span key={nodeId}>
+          <span key={nodeId} style={{ opacity: nodeId === activeNode ? 1 : 0.75, fontWeight: nodeId === activeNode ? 700 : 400 }}>
             <i style={{ background: NODE_COLORS[i] }} />
             {nodeId}
           </span>
         ))}
       </div>
 
+      {/* Target Key & FNV-1a Hash Details */}
       {keyPos && (
-        <div className="hash-ring-key" style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", marginTop: "6px" }}>
-          Target: <strong>{activeKey}</strong> · Hash: <strong>{keyPos.hash}</strong> → <span style={{ color: activeColor, fontWeight: 700 }}>{activeNode}</span>
+        <div className="hash-ring-key" style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", marginTop: "4px" }}>
+          Active: <strong>{activeKey}</strong> · Hash: <strong>{keyPos.hash}</strong> → <span style={{ color: activeColor, fontWeight: 700 }}>{activeNode}</span>
         </div>
       )}
     </div>
