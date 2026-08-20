@@ -270,28 +270,9 @@ export default function DocsPage() {
 
       {/* Main Layout Container */}
       <div style={{ display: "flex", width: "100%", minHeight: "calc(100vh - 60px)" }}>
-        {/* Left Column: Fixed Sidebar */}
-        <aside
-          style={{
-            position: "fixed",
-            top: "60px",
-            left: 0,
-            bottom: 0,
-            width: "280px",
-            padding: "36px 28px",
-            borderRight: "1px solid var(--border-default)",
-            background: "var(--bg-canvas)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            zIndex: 40,
-          }}
-        >
+        {/* Left Column: Fixed Sidebar with OptionWheel (Desktop only) */}
+        <aside className="docs-sidebar">
           <div>
-            {/* <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: "16px", fontFamily: "var(--font-mono)" }}>
-              Table of Contents
-            </div> */}
-
             <OptionWheel
               items={SECTIONS.map((s) => s.label)}
               defaultSelected={activeSectionIndex}
@@ -301,26 +282,10 @@ export default function DocsPage() {
               className="docs-option-wheel"
             />
           </div>
-
-          {/* <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: "16px", fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)", lineHeight: 1.7 }}>
-            <div>Gateway: <strong>:8000</strong></div>
-            <div>Topology: <strong>9 Nodes (3 EC2)</strong></div>
-            <div>Database: <strong>RDS Postgres</strong></div>
-          </div> */}
         </aside>
 
         {/* Right Column: Independently Scrolling Documentation Stream */}
-        <main
-          style={{
-            marginLeft: "280px",
-            width: "calc(100% - 280px)",
-            padding: "36px 48px 80px 48px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "32px",
-            maxWidth: "1160px",
-          }}
-        >
+        <main className="docs-main">
           {/* Section 1: 1-File SDKs */}
           <section id="section-sdks" className="sys-panel" style={{ scrollMarginTop: "80px" }}>
             <div className="sys-panel-header">

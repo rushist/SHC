@@ -285,3 +285,41 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
     white-space: normal;
   }
 }
+
+/* Documentation Page Layout */
+.docs-sidebar {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  padding: 36px 28px;
+  border-right: 1px solid var(--border-default);
+  background: var(--bg-canvas);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 40;
+}
+
+.docs-main {
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  padding: 36px 48px 80px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 1160px;
+}
+
+@media (max-width: 900px) {
+  .docs-sidebar,
+  .docs-option-wheel {
+    display: none !important;
+  }
+  .docs-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 16px 12px 60px 12px !important;
+  }
+}
